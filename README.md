@@ -29,9 +29,9 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Simple UI/UX
 - Mobile friendly
 - Offer different cursor modes:
-  - No cursor (just auto scroll the tab) - You can use it to learn to coop with drums, not just following the cursor
-  - Highlight the current bar
-  - Follow cursor
+    - No cursor (just auto scroll the tab) - You can use it to learn to coop with drums, not just following the cursor
+    - Highlight the current bar
+    - Follow cursor
 - Notes coloring
 - Dark/Light tab colors
 - Able to show the score view instead of tab view
@@ -117,7 +117,7 @@ Go to `http://localhost:47777` to access the web UI.
 
 Requirements:
 
-- [Deno](https://deno.land/) 2.9.0 or above
+- [Deno](https://deno.land/) 2.9.3 or above
 - Git
 
 ```bash
@@ -200,11 +200,11 @@ Reddit post: https://www.reddit.com/r/selfhosted/comments/1nuisjc/i_built_a_self
 
 ## Free Resources
 
-- [Ultimate Guitar](https://www.ultimate-guitar.com/) - Some free tabs in *.gp format
+- [Ultimate Guitar](https://www.ultimate-guitar.com/) - Some free tabs in \*.gp format
 
 - [911Tabs](https://www.911tabs.com/) - Search engine for tabs
 - [MuseScore (Free Download filtered)](https://musescore.com/sheetmusic?instrument=72%2C73&recording_type=free-download) - Some free tabs in MusicXML format
-- [GProTab](https://gprotab.net/) - Free Guitar Pro tabs in *.gp format
+- [GProTab](https://gprotab.net/) - Free Guitar Pro tabs in \*.gp format
 
 ## Special Thanks
 
