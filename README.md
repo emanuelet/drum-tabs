@@ -25,6 +25,7 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Sync your tabs with audio files (.mp3, .ogg) or Youtube videos
 - MIDI Synth - able to mute tracks and solo tracks
 - Supports .gp, .gpx, .gp3, .gp4, .gp5, .musicxml, .capx formats
+- Converts Ultimate Guitar-style drum ASCII text to MusicXML from the New Tab page
 - Simple UI/UX
 - Mobile friendly
 - Offer different cursor modes:
@@ -78,6 +79,32 @@ docker compose up -d  # Run in background
 
 Go to `http://localhost:47777` to access the web UI.
 
+## Local MCP Server
+
+Run a local stdio MCP server for agents that need full control of this tab library:
+
+```bash
+DATA_DIR=./data deno task mcp
+```
+
+It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP
+client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
+
+Configure a local MCP client to start it from this repository:
+
+```json
+{
+    "mcpServers": {
+        "drum-tabs": {
+            "command": "deno",
+            "args": ["task", "mcp"],
+            "cwd": "/path/to/drum-tabs",
+            "env": { "DATA_DIR": "/path/to/drum-tabs/data" }
+        }
+    }
+}
+```
+
 ### Docker
 
 ```bash
@@ -90,7 +117,7 @@ Go to `http://localhost:47777` to access the web UI.
 
 Requirements:
 
-- [Deno](https://deno.land/) 2.4.4 or above
+- [Deno](https://deno.land/) 2.9.0 or above
 - Git
 
 ```bash

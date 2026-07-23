@@ -1,0 +1,28 @@
+C1 : LEFT CRASH
+C2 : RIGHT CRASH
+H  : HI HAT (PLAYED LOOSE IN THIS SONG)
+1T : SMALL TOM
+2T : MIDDLE TOM
+3T : FLOOR TOM
+S  : SNARE DRUM
+B  : BASS DRUM
+ff : FLAT FLAM
+cg : CRASH GRAB
+X  : ACCENT
+
+[Intro]
+(repeat 3 times)
+H  |----x-------x---|----x-----xxx---|
+C2 |----------------|--------------X-|
+2T |o---o---o---o-o-|o---o-----------|
+1T |----------------|------------o---|
+3T |o-o-o-o-o-o-o-o-|o-o-o-o-o-o-o---|
+S  |--------------ff|------o-------o-|
+B  |o-------o-------|o-------o-------|
+
+[Chorus]
+C1 |X---------------|--------------X-|
+H  |--x-x-x-x-x-x-x-|x-x-x-x-x-x-x---|
+S  |----o-------o---|----o---------o-|
+B  |o-------o-o-----|o-------o---o---|
+C1 |cg------------X-|

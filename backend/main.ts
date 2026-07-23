@@ -9,6 +9,8 @@ import { serveStatic } from "@hono/hono/deno";
 import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getSourceDir, host, isDemoMode, isDev, port, start, tabDir } from "./util.ts";
 import * as path from "@std/path";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
+import { parseDrumTab } from "./drum_parser.ts";
+import { toMusicXml } from "./drum_musicxml.ts";
 import {
     addAudio,
     addYoutube,
@@ -198,6 +200,23 @@ export async function main() {
         }
     });
 
+    app.post("/api/new-drum-tab", async (c) => {
+        try {
+            await checkLogin(c);
+            const form = await c.req.formData();
+            const file = form.get("file");
+            if (!(file instanceof File)) throw new Error("No file uploaded");
+            const parsed = parseDrumTab(await file.text());
+            const titleValue = form.get("title");
+            const artistValue = form.get("artist");
+            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || file.name.replace(/\.txt$/i, "");
+            const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
+            const id = await createTab(new TextEncoder().encode(toMusicXml({ ...parsed, title, artist })), "musicxml", title, artist, file.name);
+            return c.json({ ok: true, id, warnings: parsed.warnings });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
     // Ultimate Guitar search proxy. The cookie is supplied by the client and is never stored.
     app.get("/api/ultimate-guitar/search", async (c) => {
         try {
@@ -477,6 +496,29 @@ export async function main() {
             return c.json({
                 ok: true,
             });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    // Credentials remain server-side; the browser only receives search results.
+    app.get("/api/youtube-suggestions", async (c) => {
+        try {
+            await checkLogin(c);
+            const query = c.req.query("q")?.trim();
+            if (!query || query.length > 200) throw new Error("Search query must be between 1 and 200 characters");
+
+            const username = Deno.env.get("YATTEE_USERNAME");
+            const password = Deno.env.get("YATTEE_PASSWORD");
+            if (!username || !password) throw new Error("Yattee search is not configured");
+
+            const url = new URL("/api/v1/search", Deno.env.get("YATTEE_BASE_URL") || "https://yattee.etonello.work");
+            url.searchParams.set("q", query);
+            url.searchParams.set("type", "video");
+            const response = await fetch(url, { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } });
+            if (!response.ok) throw new Error(`Yattee search failed (${response.status})`);
+            const results = await response.json() as { videoId?: string }[];
+            return c.json({ ok: true, videos: results.filter((video) => video.videoId).slice(0, 10) });
         } catch (e) {
             return generalError(c, e);
         }

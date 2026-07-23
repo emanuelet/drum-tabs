@@ -8,6 +8,7 @@ import Login from "./pages/Login.vue";
 import TabConfig from "./pages/TabConfig.vue";
 import Settings from "./pages/Settings.vue";
 import TabNew from "./pages/TabNew.vue";
+import Exercises from "./pages/Exercises.vue";
 
 const Tab = () => import("./pages/Tab.vue");
 
@@ -52,6 +53,11 @@ const routes: RouteRecordRaw[] = [
                         name: "settings",
                         path: "/settings",
                         component: Settings,
+                    },
+                    {
+                        name: "exercises",
+                        path: "/exercises",
+                        component: Exercises,
                     },
                 ],
             },

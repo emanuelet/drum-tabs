@@ -29,6 +29,7 @@
         "build-docker-nightly": "deno task build-frontend && docker build -t louislam/its-mytabs:nightly -f Dockerfile . --push",
         "build-frontend": "cd frontend && deno run build",
         "start-with-build": "deno task build-frontend && deno task start",
+        "mcp": "deno run --allow-env=DATA_DIR,MYTABS_DEMO_MODE,MYTABS_HOST,MYTABS_PORT --allow-read --allow-write backend/mcp.ts",
 
         "build-mpchc-controller": "deno compile --allow-all --output=mpchc-controller extra/mpchc-controller.ts"
     },
@@ -64,6 +65,7 @@
     "imports": {
         "@hono/hono": "jsr:@hono/hono@~4.9.12",
         "@hono/node-server": "npm:@hono/node-server@~1.19.9",
+        "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@~1.29.0",
         "@std/dotenv": "jsr:@std/dotenv@~0.225.6",
         "@std/fs": "jsr:@std/fs@~1.0.23",
         "@std/jsonc": "jsr:@std/jsonc@~1.0.2",

@@ -6,6 +6,8 @@ import { notify } from "@kyvg/vue3-notification";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { isLoggedIn } from "../auth-client.js";
 import { getKeySignature } from "../util.ts";
+import TextTabPlayer from "../components/TextTabPlayer.vue";
+import { applyScoreColors, getStaveProfile, overrideHiddenStaves } from "../composables/alphaTabRenderer.js";
 
 const alphaTab = await import("@coderline/alphatab");
 const { ScrollMode, StaveProfile } = alphaTab;
@@ -31,7 +33,7 @@ export default defineComponent({
 
     youtubePlayer: null,
 
-    components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown },
+    components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown, TextTabPlayer },
     emits: ["setFixedHeader"],
     data() {
         return {
@@ -92,6 +94,7 @@ export default defineComponent({
             setting: {},
             simpleSyncSecond: -1,
             toolbarAutoHide: false,
+            isTextTab: false,
         };
     },
     computed: {
@@ -320,6 +323,12 @@ export default defineComponent({
         const urlParams = new URLSearchParams(window.location.search);
 
         try {
+            const metadata = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" }).then((res) => res.json());
+            if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
+                this.isTextTab = true;
+                return;
+            }
+
             // Override trackID if provided in URL
             const trackParam = urlParams.get("track");
             if (trackParam) {
@@ -389,7 +398,7 @@ export default defineComponent({
             this._onDocumentClick = undefined;
         }
 
-        this.socket.disconnect();
+        this.socket?.disconnect();
     },
     methods: {
         async load(trackID) {
@@ -623,7 +632,7 @@ export default defineComponent({
                         playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
                     },
                     display: {
-                        staveProfile: this.getStaveProfile(),
+                        staveProfile: getStaveProfile(this.setting.scoreStyle, StaveProfile),
                         resources: displayResources,
                         layoutMode,
                         scale: this.setting.scale,
@@ -651,7 +660,7 @@ export default defineComponent({
                 this.api.scoreLoaded.on(async (score) => {
                     console.log("Score loaded");
 
-                    this.applyColors(score);
+                    applyScoreColors(score, this.setting, alphaTab);
 
                     // Track
                     if (trackID < 0 || trackID >= score.tracks.length) {
@@ -711,7 +720,7 @@ export default defineComponent({
                         this.api.updateSettings();
                     } else {
                         // This will break drum score
-                        this.overrideHiddenStaves(score);
+                        overrideHiddenStaves(score, this.setting.scoreStyle);
                     }
 
                     this.enableBackingTrack = this.hasBackingTrack();
@@ -1453,7 +1462,8 @@ export default defineComponent({
 </script>
 
 <template>
-    <div class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
+    <TextTabPlayer v-if="isTextTab" :id="String(tabID)" />
+    <div v-else class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
         <h1>{{ tab.title }}</h1>
         <h2>{{ tab.artist }}</h2>
         <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature">
@@ -1605,7 +1615,8 @@ $youtube-height: 200px;
         background-color: #f1f1f1;
         padding-top: 30px;
 
-        h1, h2 {
+        h1,
+        h2 {
             color: #333;
         }
     }
@@ -1651,7 +1662,8 @@ $youtube-height: 200px;
             text-align: right;
         }
 
-        .button, .btn {
+        .button,
+        .btn {
             height: 44px;
             white-space: nowrap;
         }

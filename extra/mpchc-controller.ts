@@ -21,7 +21,7 @@ try {
 
 console.log("Connecting to server at", baseURL);
 
-let interval: number | undefined = undefined;
+let interval: ReturnType<typeof setInterval> | undefined;
 let currentState = {
     state: "Unknown",
     position: -1,

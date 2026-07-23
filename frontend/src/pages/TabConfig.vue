@@ -18,6 +18,8 @@ export default defineComponent({
             page: "",
             youtubeURL: "",
             youtubeList: [],
+            youtubeSuggestions: [],
+            isSearchingYoutube: false,
             audioList: [],
             // isLocalIP: false,
             supportedFormatCommaString,
@@ -125,6 +127,24 @@ export default defineComponent({
             } catch (e) {
                 generalError(e);
             }
+        },
+        async searchYoutube() {
+            this.isSearchingYoutube = true;
+            try {
+                const query = [this.tab.artist, this.tab.title].filter(Boolean).join(" ");
+                const res = await fetch(baseURL + `/api/youtube-suggestions?q=${encodeURIComponent(query)}`, { credentials: "include" });
+                await checkFetch(res);
+                this.youtubeSuggestions = (await res.json()).videos;
+            } catch (e) {
+                generalError(e);
+            } finally {
+                this.isSearchingYoutube = false;
+            }
+        },
+        async addYoutubeSuggestion(videoID) {
+            this.youtubeURL = `https://www.youtube.com/watch?v=${videoID}`;
+            await this.addYoutube();
+            this.youtubeSuggestions = [];
         },
 
         async saveYoutube(video) {
@@ -433,6 +453,17 @@ export default defineComponent({
                 </div>
             </div>
 
+            <button class="btn btn-outline-secondary mb-3" type="button" @click="searchYoutube" :disabled="isSearchingYoutube">
+                {{ isSearchingYoutube ? "Searching..." : "Find YouTube matches" }}
+            </button>
+            <div v-if="youtubeSuggestions.length" class="mb-4 youtube-suggestions">
+                <div v-for="video in youtubeSuggestions" :key="video.videoId" class="suggestion">
+                    <img v-if="video.videoThumbnails?.[1]" :src="video.videoThumbnails[1].url" alt="" />
+                    <div><strong>{{ video.title }}</strong><br /><small>{{ video.author }} · {{ video.lengthSeconds }}s</small></div>
+                    <button class="btn btn-sm btn-primary" type="button" @click="addYoutubeSuggestion(video.videoId)">Use</button>
+                </div>
+            </div>
+
             <div class="mb-4">
                 <!-- Youtube Item -->
                 <div v-for="video in youtubeList" :key="video.id" class="mb-3 pb-5 youtube-item">
@@ -570,7 +601,8 @@ export default defineComponent({
     }
 }
 
-.youtube-item, .audio-item {
+.youtube-item,
+.audio-item {
     display: flex;
     gap: 15px;
     align-items: flex-start;
@@ -580,6 +612,22 @@ export default defineComponent({
     }
     .buttons {
         align-self: center;
+    }
+}
+
+.suggestion {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+    img {
+        width: 120px;
+        height: 68px;
+        object-fit: cover;
+    }
+    div {
+        flex: 1;
     }
 }
 </style>

@@ -6,6 +6,7 @@ export const supportedFormatList = [
     "gp5",
     "musicxml",
     "capx",
+    "txt",
 ];
 
 /**
