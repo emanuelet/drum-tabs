@@ -68,3 +68,20 @@ Deno.test("accepts the official tabs host", async () => {
         globalThis.fetch = originalFetch;
     }
 });
+
+Deno.test("reads tab metadata from current Ultimate Guitar page state", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = () =>
+        Promise.resolve(
+            new Response(
+                '<div class="js-store" data-content="{&quot;store&quot;:{&quot;page&quot;:{&quot;data&quot;:{&quot;tab&quot;:{&quot;song_name&quot;:&quot;Pulse&quot;,&quot;artist_name&quot;:&quot;Band&quot;}}}}}"></div>',
+            ),
+        );
+    try {
+        const tab = await getUltimateGuitarTab("https://tabs.ultimate-guitar.com/tab/band/pulse-42", "sid=abc");
+        assertEquals(tab.title, "Pulse");
+        assertEquals(tab.artist, "Band");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

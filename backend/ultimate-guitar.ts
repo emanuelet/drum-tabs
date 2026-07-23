@@ -130,9 +130,21 @@ export async function getUltimateGuitarTab(url: string, cookie: string) {
     const response = await fetchUltimateGuitar(parsed.toString(), cookie);
     const html = await response.text();
     const $ = cheerio.load(html);
-    const title = $("h1").first().text().trim();
+    let title = $("h1").first().text().trim();
+    let artist = "";
+    for (const element of $(".js-store[data-content]").toArray()) {
+        try {
+            const tab = JSON.parse($(element).attr("data-content") || "{}")?.store?.page?.data?.tab;
+            if (tab) {
+                title ||= tab.localized_song_name || tab.song_name || "";
+                artist ||= tab.localized_artist_name || tab.artist_name || "";
+            }
+        } catch {
+            // Fall back to static markup.
+        }
+    }
     const download = $("a[href*='download'], a[download]").map((_, element) => $(element).attr("href")).get().find(Boolean);
-    return { title, text: extractUltimateGuitarText(html), downloadUrl: download ? new URL(download, ULTIMATE_GUITAR_BASE).toString() : null };
+    return { title, artist, text: extractUltimateGuitarText(html), downloadUrl: download ? new URL(download, ULTIMATE_GUITAR_BASE).toString() : null };
 }
 
 export async function downloadUltimateGuitarFile(url: string, cookie: string) {
