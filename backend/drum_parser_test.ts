@@ -30,7 +30,7 @@ Deno.test("emits percussion MusicXML", () => {
     assert(xml.includes("<unpitched>"));
     assert(xml.includes("closed-hi-hat"));
     assert(xml.includes("<divisions>16</divisions>"));
-    assert(xml.includes("<backup><duration>64</duration></backup>"));
+    assert(!xml.includes("<backup>"));
 });
 
 Deno.test("normalizes slots, groups chords, completes voices, and emits tempo", () => {
@@ -40,8 +40,7 @@ Deno.test("normalizes slots, groups chords, completes voices, and emits tempo", 
     assert(xml.includes('<sound tempo="140"/>'));
     assert(xml.includes("<duration>32</duration>"));
     assert(xml.includes("<note><chord/><unpitched>"));
-    assert(xml.includes("<backup><duration>64</duration></backup>"));
-    assert(xml.includes("<note><rest/><duration>32</duration><voice>2</voice>"));
+    assert(!xml.includes("<backup>"));
     assert(xml.indexOf("<unpitched>") < xml.indexOf("<duration>"));
     assert(xml.indexOf("<duration>") < xml.indexOf("<instrument id="));
 });

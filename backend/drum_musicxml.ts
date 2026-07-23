@@ -26,19 +26,19 @@ function note(hit: DrumHit, duration: number, chord = false) {
         : "";
     return `<note>${
         chord ? "<chord/>" : ""
-    }<unpitched><display-step>${mapping.step}</display-step><display-octave>${mapping.octave}</display-octave></unpitched><duration>${duration}</duration><instrument id="P1-${hit.instrument}"/><voice>${mapping.voice}</voice><type>${
+    }<unpitched><display-step>${mapping.step}</display-step><display-octave>${mapping.octave}</display-octave></unpitched><duration>${duration}</duration><instrument id="P1-${hit.instrument}"/><voice>1</voice><type>${
         typeFor(duration)
     }</type><stem>${mapping.stem}</stem>${notehead}</note>`;
 }
 
-function rest(voice: number, duration: number) {
-    return `<note><rest/><duration>${duration}</duration><voice>${voice}</voice><type>${typeFor(duration)}</type></note>`;
+function rest(duration: number) {
+    return `<note><rest/><duration>${duration}</duration><voice>1</voice><type>${typeFor(duration)}</type></note>`;
 }
 
-function voiceNotes(hits: DrumHit[], voice: 1 | 2, slotCount: number) {
+function voiceNotes(hits: DrumHit[], slotCount: number) {
     const at = (hit: DrumHit) => Math.max(0, Math.min(measureDuration, Math.round(hit.slot * measureDuration / slotCount)));
     const groups = new Map<number, DrumHit[]>();
-    for (const hit of hits.filter((hit) => hit.voice === voice)) {
+    for (const hit of hits) {
         const position = at(hit);
         groups.set(position, [...(groups.get(position) ?? []), hit]);
     }
@@ -47,12 +47,12 @@ function voiceNotes(hits: DrumHit[], voice: 1 | 2, slotCount: number) {
     const positions = [...groups.keys()].sort((a, b) => a - b);
     for (let index = 0; index < positions.length; index++) {
         const position = positions[index];
-        if (position > cursor) xml += rest(voice, position - cursor);
+        if (position > cursor) xml += rest(position - cursor);
         const duration = Math.max(1, (positions[index + 1] ?? measureDuration) - position);
         groups.get(position)!.forEach((hit, hitIndex) => xml += note(hit, duration, hitIndex > 0));
         cursor = Math.max(cursor, position + duration);
     }
-    if (cursor < measureDuration) xml += rest(voice, measureDuration - cursor);
+    if (cursor < measureDuration) xml += rest(measureDuration - cursor);
     return xml;
 }
 
@@ -67,10 +67,7 @@ export function toMusicXml(tab: ParsedDrumTab): string {
         const direction = index === 0
             ? `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type><sound tempo="${tempo}"/></direction>`
             : "";
-        const voices = ([1, 2] as const).map((voice, voiceIndex) =>
-            `${voiceIndex ? `<backup><duration>${measureDuration}</duration></backup>` : ""}${voiceNotes(measure.hits, voice, Math.max(1, measure.slotCount))}`
-        ).join("");
-        return `<measure number="${index + 1}">${attributes}${direction}${voices}</measure>`;
+        return `<measure number="${index + 1}">${attributes}${direction}${voiceNotes(measure.hits, Math.max(1, measure.slotCount))}</measure>`;
     }).join("");
     return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="3.1"><work><work-title>${esc(tab.title ?? "Drum Tab")}</work-title></work><identification><creator type="composer">${
         esc(tab.artist ?? "")
