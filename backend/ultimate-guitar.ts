@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 
 export const ULTIMATE_GUITAR_BASE = "https://www.ultimate-guitar.com";
+const ultimateGuitarHosts = new Set(["www.ultimate-guitar.com", "ultimate-guitar.com"]);
 const MAX_COOKIE_LENGTH = 16_384;
 
 export type UltimateGuitarMode = "guitar-pro" | "ascii-drums";
@@ -125,7 +126,7 @@ export async function searchUltimateGuitar(query: string, mode: UltimateGuitarMo
 
 export async function getUltimateGuitarTab(url: string, cookie: string) {
     const parsed = new URL(url);
-    if (parsed.origin !== ULTIMATE_GUITAR_BASE) throw new UltimateGuitarError("invalid_url", "Invalid Ultimate Guitar tab URL.");
+    if (parsed.protocol !== "https:" || !ultimateGuitarHosts.has(parsed.hostname)) throw new UltimateGuitarError("invalid_url", "Invalid Ultimate Guitar tab URL.");
     const response = await fetchUltimateGuitar(parsed.toString(), cookie);
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -136,6 +137,6 @@ export async function getUltimateGuitarTab(url: string, cookie: string) {
 
 export async function downloadUltimateGuitarFile(url: string, cookie: string) {
     const parsed = new URL(url);
-    if (parsed.origin !== ULTIMATE_GUITAR_BASE) throw new UltimateGuitarError("invalid_url", "Invalid Ultimate Guitar download URL.");
+    if (parsed.protocol !== "https:" || !ultimateGuitarHosts.has(parsed.hostname)) throw new UltimateGuitarError("invalid_url", "Invalid Ultimate Guitar download URL.");
     return fetchUltimateGuitar(parsed.toString(), cookie, "application/octet-stream");
 }

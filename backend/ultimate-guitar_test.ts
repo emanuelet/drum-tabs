@@ -1,5 +1,12 @@
 import { assertEquals, assertRejects, assertStringIncludes, assertThrows } from "jsr:@std/assert@^1.0.17";
-import { buildUltimateGuitarSearchUrl, downloadUltimateGuitarFile, extractUltimateGuitarText, parseUltimateGuitarSearch, validateUltimateGuitarCookie } from "./ultimate-guitar.ts";
+import {
+    buildUltimateGuitarSearchUrl,
+    downloadUltimateGuitarFile,
+    extractUltimateGuitarText,
+    getUltimateGuitarTab,
+    parseUltimateGuitarSearch,
+    validateUltimateGuitarCookie,
+} from "./ultimate-guitar.ts";
 
 Deno.test("builds filtered Ultimate Guitar search URLs", () => {
     const url = buildUltimateGuitarSearchUrl("led zeppelin", "ascii-drums");
@@ -40,4 +47,14 @@ Deno.test("extracts the complete ASCII tab without collapsing lines", () => {
 
 Deno.test("does not request non-Ultimate Guitar download URLs", async () => {
     await assertRejects(() => downloadUltimateGuitarFile("https://example.com/file.gp", "sid=abc"), Error, "Invalid Ultimate Guitar download URL");
+});
+
+Deno.test("accepts the official non-www tab host", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = () => Promise.resolve(new Response("<h1>Pulse</h1>"));
+    try {
+        assertEquals((await getUltimateGuitarTab("https://ultimate-guitar.com/tab/band/pulse-42", "sid=abc")).title, "Pulse");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });
