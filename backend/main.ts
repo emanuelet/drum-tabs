@@ -217,7 +217,6 @@ export async function main() {
             return generalError(c, e);
         }
     });
-
     // Ultimate Guitar search proxy. The cookie is supplied by the client and is never stored.
     app.get("/api/ultimate-guitar/search", async (c) => {
         try {

@@ -241,7 +241,6 @@ export default defineComponent({
         >
             Import Selected Drum ASCII as MusicXML
         </button>
-
         <section class="ultimate-guitar mt-5">
             <h2>Ultimate Guitar</h2>
             <p class="text-secondary">Paste the Cookie header from your browser. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
