@@ -71,6 +71,28 @@ export default defineComponent({
             // Reset Dropzone
             this.isUploading = false;
         },
+        async importDrumAscii() {
+            const file = this.files[0]?.file;
+            if (!file || !file.name.toLowerCase().endsWith(".txt")) {
+                notify({ text: "Select one .txt drum tab first", type: "error" });
+                return;
+            }
+            this.isUploading = true;
+            try {
+                const formData = new FormData();
+                formData.append("file", file);
+                const res = await fetch(baseURL + "/api/new-drum-tab", { method: "POST", credentials: "include", body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Drum import failed");
+                if (data.warnings?.length) notify({ text: data.warnings.join("; "), type: "warn" });
+                notify({ text: "Drum tab converted to MusicXML", type: "success" });
+                this.$router.push(`/tab/${data.id}`);
+            } catch (err) {
+                notify({ text: `Drum import error: ${err.message}`, type: "error" });
+            } finally {
+                this.isUploading = false;
+            }
+        },
         dropzoneError(err) {
             console.log(err);
             notify({ text: err.type || "Dropzone error", type: "error" });
@@ -125,6 +147,14 @@ export default defineComponent({
             :disabled="isUploading"
         >
             {{ isUploading ? "Uploading..." : "Upload" }}
+        </button>
+
+        <button
+            @click="importDrumAscii"
+            class="btn btn-outline-secondary w-100 mt-2"
+            :disabled="isUploading"
+        >
+            Import Selected Drum ASCII as MusicXML
         </button>
 
         <ul class="mt-3">

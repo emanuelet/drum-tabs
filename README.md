@@ -25,6 +25,7 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Sync your tabs with audio files (.mp3, .ogg) or Youtube videos
 - MIDI Synth - able to mute tracks and solo tracks
 - Supports .gp, .gpx, .gp3, .gp4, .gp5, .musicxml, .capx formats
+- Converts Ultimate Guitar-style drum ASCII text to MusicXML from the New Tab page
 - Simple UI/UX
 - Mobile friendly
 - Offer different cursor modes:

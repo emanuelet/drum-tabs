@@ -9,6 +9,8 @@ import { serveStatic } from "@hono/hono/deno";
 import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getSourceDir, host, isDemoMode, isDev, port, start, tabDir } from "./util.ts";
 import * as path from "@std/path";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
+import { parseDrumTab } from "./drum_parser.ts";
+import { toMusicXml } from "./drum_musicxml.ts";
 import {
     addAudio,
     addYoutube,
@@ -192,6 +194,24 @@ export async function main() {
                 ok: true,
                 id,
             });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/new-drum-tab", async (c) => {
+        try {
+            await checkLogin(c);
+            const form = await c.req.formData();
+            const file = form.get("file");
+            if (!(file instanceof File)) throw new Error("No file uploaded");
+            const parsed = parseDrumTab(await file.text());
+            const titleValue = form.get("title");
+            const artistValue = form.get("artist");
+            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || file.name.replace(/\.txt$/i, "");
+            const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
+            const id = await createTab(new TextEncoder().encode(toMusicXml({ ...parsed, title, artist })), "musicxml", title, artist, file.name);
+            return c.json({ ok: true, id, warnings: parsed.warnings });
         } catch (e) {
             return generalError(c, e);
         }
