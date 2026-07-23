@@ -71,6 +71,32 @@ docker compose up -d  # Run in background
 
 Go to `http://localhost:47777` to access the web UI.
 
+## Local MCP Server
+
+Run a local stdio MCP server for agents that need full control of this tab library:
+
+```bash
+DATA_DIR=./data deno task mcp
+```
+
+It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP
+client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
+
+Configure a local MCP client to start it from this repository:
+
+```json
+{
+    "mcpServers": {
+        "drum-tabs": {
+            "command": "deno",
+            "args": ["task", "mcp"],
+            "cwd": "/path/to/drum-tabs",
+            "env": { "DATA_DIR": "/path/to/drum-tabs/data" }
+        }
+    }
+}
+```
+
 ### Docker
 
 ```bash
