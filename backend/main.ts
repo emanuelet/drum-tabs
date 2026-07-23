@@ -36,6 +36,7 @@ import sanitize from "sanitize-filename";
 import "@std/dotenv/load";
 import { socketIO } from "./socket.ts";
 import * as cheerio from "cheerio";
+import { downloadUltimateGuitarFile, getUltimateGuitarTab, searchUltimateGuitar, UltimateGuitarError } from "./ultimate-guitar.ts";
 
 let httpServer: ServerType;
 
@@ -194,6 +195,41 @@ export async function main() {
             });
         } catch (e) {
             return generalError(c, e);
+        }
+    });
+
+    // Ultimate Guitar search proxy. The cookie is supplied by the client and is never stored.
+    app.get("/api/ultimate-guitar/search", async (c) => {
+        try {
+            await checkLogin(c);
+            const query = c.req.query("query") || "";
+            const mode = c.req.query("mode") === "ascii-drums" ? "ascii-drums" : "guitar-pro";
+            const page = Number.parseInt(c.req.query("page") || "1", 10);
+            const results = await searchUltimateGuitar(query, mode, c.req.header("x-ultimate-guitar-cookie") || "", page);
+            return c.json({ ok: true, results });
+        } catch (e) {
+            return ultimateGuitarError(c, e);
+        }
+    });
+
+    app.get("/api/ultimate-guitar/tab", async (c) => {
+        try {
+            await checkLogin(c);
+            const url = c.req.query("url") || "";
+            const tab = await getUltimateGuitarTab(url, c.req.header("x-ultimate-guitar-cookie") || "");
+            return c.json({ ok: true, tab });
+        } catch (e) {
+            return ultimateGuitarError(c, e);
+        }
+    });
+
+    app.get("/api/ultimate-guitar/download", async (c) => {
+        try {
+            await checkLogin(c);
+            const response = await downloadUltimateGuitarFile(c.req.query("url") || "", c.req.header("x-ultimate-guitar-cookie") || "");
+            return new Response(response.body, { status: 200, headers: { "Content-Type": response.headers.get("content-type") || "application/octet-stream" } });
+        } catch (e) {
+            return ultimateGuitarError(c, e);
         }
     });
 
@@ -763,6 +799,11 @@ function generalError(c: Context, e: unknown) {
             msg: "Unknown error",
         }, 400);
     }
+}
+
+function ultimateGuitarError(c: Context, e: unknown) {
+    if (e instanceof UltimateGuitarError) return c.json({ ok: false, code: e.code, msg: e.message }, e.status as 400);
+    return c.json({ ok: false, code: "upstream_error", msg: e instanceof Error ? e.message : "Ultimate Guitar request failed" }, 502);
 }
 
 if (import.meta.main) {
