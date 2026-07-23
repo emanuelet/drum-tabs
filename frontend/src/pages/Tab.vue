@@ -6,6 +6,7 @@ import { notify } from "@kyvg/vue3-notification";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { isLoggedIn } from "../auth-client.js";
 import { getKeySignature } from "../util.ts";
+import TextTabPlayer from "../components/TextTabPlayer.vue";
 
 const alphaTab = await import("@coderline/alphatab");
 const { ScrollMode, StaveProfile } = alphaTab;
@@ -31,7 +32,7 @@ export default defineComponent({
 
     youtubePlayer: null,
 
-    components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown },
+    components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown, TextTabPlayer },
     emits: ["setFixedHeader"],
     data() {
         return {
@@ -92,6 +93,7 @@ export default defineComponent({
             setting: {},
             simpleSyncSecond: -1,
             toolbarAutoHide: false,
+            isTextTab: false,
         };
     },
     computed: {
@@ -316,11 +318,17 @@ export default defineComponent({
         this.isLoggedIn = await isLoggedIn();
         this.setting = getSetting();
         this.toolbarHidden = this.setting.toolbarAutoHide;
-        this.tabID = this.$route.params.id;
-        const urlParams = new URLSearchParams(window.location.search);
+            this.tabID = this.$route.params.id;
+            const urlParams = new URLSearchParams(window.location.search);
 
-        try {
-            // Override trackID if provided in URL
+            try {
+                const metadata = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" }).then((res) => res.json());
+                if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
+                    this.isTextTab = true;
+                    return;
+                }
+
+                // Override trackID if provided in URL
             const trackParam = urlParams.get("track");
             if (trackParam) {
                 const id = parseInt(trackParam);
@@ -389,7 +397,7 @@ export default defineComponent({
             this._onDocumentClick = undefined;
         }
 
-        this.socket.disconnect();
+        this.socket?.disconnect();
     },
     methods: {
         async load(trackID) {
@@ -1453,7 +1461,8 @@ export default defineComponent({
 </script>
 
 <template>
-    <div class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
+    <TextTabPlayer v-if="isTextTab" :id="String(tabID)" />
+    <div v-else class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
         <h1>{{ tab.title }}</h1>
         <h2>{{ tab.artist }}</h2>
         <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature">

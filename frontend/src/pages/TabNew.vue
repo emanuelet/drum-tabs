@@ -29,19 +29,17 @@ export default defineComponent({
             const uploadPromises = this.files.map(async (f) => {
                 try {
                     const file = f.file;
-                    // Try to parse the file with AlphaTab to ensure it's valid
-                    const data = await file.arrayBuffer();
-
-                    const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(
-                        new Uint8Array(data),
+                    const isText = file.name.toLowerCase().endsWith(".txt");
+                    const score = isText ? null : alphaTab.importer.ScoreLoader.loadScoreFromBytes(
+                        new Uint8Array(await file.arrayBuffer()),
                         new alphaTab.Settings(),
                     );
 
                     // Upload to /api/new-tab
                     const formData = new FormData();
                     formData.append("file", file);
-                    formData.append("title", score.title);
-                    formData.append("artist", score.artist);
+                    formData.append("title", score?.title || file.name.replace(/\.txt$/i, ""));
+                    formData.append("artist", score?.artist || "");
 
                     const res = await fetch(baseURL + "/api/new-tab", {
                         method: "POST",
@@ -55,7 +53,7 @@ export default defineComponent({
                     }
 
                     const respData = await res.json();
-                    notify({ text: `Uploaded: ${score.artist} - ${score.title}`, type: "success" });
+                    notify({ text: `Uploaded: ${score?.artist || ""} - ${score?.title || file.name}`, type: "success" });
                     return respData.id;
                 } catch (err) {
                     notify({ text: `Error with ${f.name}: ${err.message}`, type: "error" });
@@ -108,7 +106,7 @@ export default defineComponent({
 
 <template>
     <div class="container my-container">
-        <div class="display-6 mb-4 mt-5">Upload Guitar Pro or MusicXML files</div>
+        <div class="display-6 mb-4 mt-5">Upload tabs or text sheets</div>
 
         <Vue3Dropzone
             v-model="files"
