@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { isLoggedIn } from "../auth-client.js";
 import { getKeySignature } from "../util.ts";
 import TextTabPlayer from "../components/TextTabPlayer.vue";
+import { applyScoreColors, getStaveProfile, overrideHiddenStaves } from "../composables/alphaTabRenderer.js";
 
 const alphaTab = await import("@coderline/alphatab");
 const { ScrollMode, StaveProfile } = alphaTab;
@@ -631,7 +632,7 @@ export default defineComponent({
                         playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
                     },
                     display: {
-                        staveProfile: this.getStaveProfile(),
+                        staveProfile: getStaveProfile(this.setting.scoreStyle, StaveProfile),
                         resources: displayResources,
                         layoutMode,
                         scale: this.setting.scale,
@@ -659,7 +660,7 @@ export default defineComponent({
                 this.api.scoreLoaded.on(async (score) => {
                     console.log("Score loaded");
 
-                    this.applyColors(score);
+                    applyScoreColors(score, this.setting, alphaTab);
 
                     // Track
                     if (trackID < 0 || trackID >= score.tracks.length) {
@@ -719,7 +720,7 @@ export default defineComponent({
                         this.api.updateSettings();
                     } else {
                         // This will break drum score
-                        this.overrideHiddenStaves(score);
+                        overrideHiddenStaves(score, this.setting.scoreStyle);
                     }
 
                     this.enableBackingTrack = this.hasBackingTrack();

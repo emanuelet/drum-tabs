@@ -109,7 +109,7 @@ Go to `http://localhost:47777` to access the web UI.
 
 Requirements:
 
-- [Deno](https://deno.land/) 2.4.4 or above
+- [Deno](https://deno.land/) 2.9.0 or above
 - Git
 
 ```bash
