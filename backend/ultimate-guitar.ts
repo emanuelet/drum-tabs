@@ -56,6 +56,29 @@ function parseRating(value: string | undefined): number | null {
 export function parseUltimateGuitarSearch(html: string): UltimateGuitarResult[] {
     const $ = cheerio.load(html);
     const results: UltimateGuitarResult[] = [];
+    for (const element of $(".js-store[data-content]").toArray()) {
+        try {
+            const state = JSON.parse($(element).attr("data-content") || "{}");
+            const entries = state?.store?.page?.data?.results;
+            if (!Array.isArray(entries)) continue;
+            for (const entry of entries) {
+                if (!entry?.id || !entry?.tab_url || !entry?.type) continue;
+                const url = new URL(entry.tab_url, ULTIMATE_GUITAR_BASE).toString();
+                if (results.some((result) => result.url === url)) continue;
+                results.push({
+                    id: String(entry.id),
+                    title: entry.localized_song_name || entry.song_name || "Untitled",
+                    artist: entry.localized_artist_name || entry.artist_name || "",
+                    rating: Number.isFinite(Number(entry.rating)) ? Number(entry.rating) : null,
+                    type: entry.type,
+                    url,
+                });
+            }
+        } catch {
+            // Fall back to legacy HTML links when the embedded state is malformed.
+        }
+    }
+    if (results.length) return results;
     $("a[href*='/tab/'], a[href*='/pro/']").each((_, element) => {
         const link = $(element);
         const href = link.attr("href");

@@ -20,6 +20,13 @@ Deno.test("parses and deduplicates search results", () => {
     assertEquals(results[0].title, "Stairway to Heaven");
 });
 
+Deno.test("parses current Ultimate Guitar embedded search state", () => {
+    const results = parseUltimateGuitarSearch(
+        '<div class="js-store" data-content="{&quot;store&quot;:{&quot;page&quot;:{&quot;data&quot;:{&quot;results&quot;:[{&quot;id&quot;:42,&quot;type&quot;:&quot;Drum Tabs&quot;,&quot;song_name&quot;:&quot;Pulse&quot;,&quot;artist_name&quot;:&quot;Band&quot;,&quot;rating&quot;:4.5,&quot;tab_url&quot;:&quot;/tab/band/pulse-drum-tabs-42&quot;}]}}}}"></div>',
+    );
+    assertEquals(results[0], { id: "42", title: "Pulse", artist: "Band", rating: 4.5, type: "Drum Tabs", url: "https://www.ultimate-guitar.com/tab/band/pulse-drum-tabs-42" });
+});
+
 Deno.test("validates cookie input", () => {
     assertThrows(() => validateUltimateGuitarCookie(""));
     assertThrows(() => validateUltimateGuitarCookie("sid=abc\nmalicious=value"));
