@@ -1,18 +1,24 @@
 <script>
 import { defineComponent } from "vue";
+import { getSetting } from "../app.js";
 import { exercises } from "../exercises.js";
 
 const alphaTab = await import("@coderline/alphatab");
 
 export default defineComponent({
     data() {
-        return { exercises, selected: exercises[0], api: null, playing: false, tempo: exercises[0].tempo, metronome: false, looping: true };
+        return { exercises, selected: exercises[0], api: null, playing: false, tempo: exercises[0].tempo, metronome: false, looping: true, setting: getSetting() };
     },
     async mounted() {
+        let resources = { tablatureFont: "bold 14px Arial", barNumberColor: "#6D6D6D" };
+        if (this.setting.scoreColor === "dark") {
+            resources = { ...resources, staffLineColor: "#6D6D6D", barSeparatorColor: "#6D6D6D", mainGlyphColor: "#A4A4A4", secondaryGlyphColor: "#A4A4A4", scoreInfoColor: "#A3A3A3" };
+        }
         this.api = new alphaTab.AlphaTabApi(this.$refs.score, {
             core: { fontDirectory: "/font/", engine: "html5" },
             player: { enablePlayer: true, enableCursor: true, soundFont: "/soundfont/sonivox.sf2", playerMode: alphaTab.PlayerMode.EnabledSynthesizer },
-            display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: 1.1 },
+            notation: { elements: { scoreTitle: false, scoreSubTitle: false, scoreArtist: false } },
+            display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
         });
         this.api.playerStateChanged.on((event) => this.playing = event.state === alphaTab.synth.PlayerState.Playing);
         this.loadExercise();
@@ -56,14 +62,15 @@ export default defineComponent({
                 <strong>{{ exercise.title }}</strong><span>{{ exercise.description }}</span><small>{{ exercise.tempo }} BPM</small>
             </button>
         </div>
-        <section class="player">
+        <section class="player" :class="{ light: setting.scoreColor === 'light' }">
             <div class="controls">
                 <button class="btn btn-primary" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
                 <label>Tempo <input v-model.number="tempo" type="number" min="30" max="240" /> BPM</label>
                 <label><input v-model="metronome" type="checkbox" /> Metronome</label>
                 <label><input v-model="looping" type="checkbox" /> Loop</label>
             </div>
-            <div ref="score" class="score"></div>
+            <h2 class="score-title">{{ selected.title }}</h2>
+            <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
         </section>
     </main>
 </template>
@@ -127,5 +134,18 @@ header {
     min-height: 260px;
     overflow-x: auto;
     padding: 16px;
+
+    &.light {
+        background: #f1f1f1;
+    }
+}
+.score-title {
+    margin: 0;
+    padding: 18px 16px 0;
+    font-size: 1.25rem;
+
+    .player.light & {
+        color: #333;
+    }
 }
 </style>
