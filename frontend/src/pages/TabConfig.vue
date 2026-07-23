@@ -621,7 +621,13 @@ export default defineComponent({
     gap: 12px;
     padding: 8px 0;
     border-bottom: 1px solid #333;
-    img { width: 120px; height: 68px; object-fit: cover; }
-    div { flex: 1; }
+    img {
+        width: 120px;
+        height: 68px;
+        object-fit: cover;
+    }
+    div {
+        flex: 1;
+    }
 }
 </style>

@@ -319,17 +319,17 @@ export default defineComponent({
         this.isLoggedIn = await isLoggedIn();
         this.setting = getSetting();
         this.toolbarHidden = this.setting.toolbarAutoHide;
-            this.tabID = this.$route.params.id;
-            const urlParams = new URLSearchParams(window.location.search);
+        this.tabID = this.$route.params.id;
+        const urlParams = new URLSearchParams(window.location.search);
 
-            try {
-                const metadata = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" }).then((res) => res.json());
-                if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
-                    this.isTextTab = true;
-                    return;
-                }
+        try {
+            const metadata = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" }).then((res) => res.json());
+            if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
+                this.isTextTab = true;
+                return;
+            }
 
-                // Override trackID if provided in URL
+            // Override trackID if provided in URL
             const trackParam = urlParams.get("track");
             if (trackParam) {
                 const id = parseInt(trackParam);
