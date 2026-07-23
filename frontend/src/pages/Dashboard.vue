@@ -62,6 +62,11 @@ export default defineComponent({
                         New Tab
                     </router-link>
 
+                    <router-link to="/exercises" v-if="isLoggedIn">
+                        <font-awesome-icon :icon='["fas", "play"]' />
+                        Exercises
+                    </router-link>
+
                     <router-link to="/settings">
                         <font-awesome-icon :icon='["fas", "gear"]' />
                         Settings
