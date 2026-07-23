@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 
 export const ULTIMATE_GUITAR_BASE = "https://www.ultimate-guitar.com";
-const ultimateGuitarHosts = new Set(["www.ultimate-guitar.com", "ultimate-guitar.com"]);
+const ultimateGuitarHosts = new Set(["www.ultimate-guitar.com", "ultimate-guitar.com", "tabs.ultimate-guitar.com"]);
 const MAX_COOKIE_LENGTH = 16_384;
 
 export type UltimateGuitarMode = "guitar-pro" | "ascii-drums";

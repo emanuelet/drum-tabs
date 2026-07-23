@@ -58,3 +58,13 @@ Deno.test("accepts the official non-www tab host", async () => {
         globalThis.fetch = originalFetch;
     }
 });
+
+Deno.test("accepts the official tabs host", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = () => Promise.resolve(new Response("<h1>Pulse</h1>"));
+    try {
+        assertEquals((await getUltimateGuitarTab("https://tabs.ultimate-guitar.com/tab/band/pulse-42", "sid=abc")).title, "Pulse");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
