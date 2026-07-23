@@ -1605,7 +1605,8 @@ $youtube-height: 200px;
         background-color: #f1f1f1;
         padding-top: 30px;
 
-        h1, h2 {
+        h1,
+        h2 {
             color: #333;
         }
     }
@@ -1651,7 +1652,8 @@ $youtube-height: 200px;
             text-align: right;
         }
 
-        .button, .btn {
+        .button,
+        .btn {
             height: 44px;
             white-space: nowrap;
         }
