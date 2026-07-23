@@ -36,6 +36,13 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Dark/Light tab colors
 - Able to show the score view instead of tab view
 - Able to share tabs with others with a link
+- Built-in Ultimate Guitar search for highly rated Guitar Pro drum tabs and ASCII drum tabs
+
+### Ultimate Guitar search
+
+On the New Tab page, paste the full `Cookie` header copied from an authenticated Ultimate Guitar browser session, choose a search mode, and search for an artist or song. Guitar Pro results are downloaded through the app and checked for a percussion track before import. ASCII results can be copied from the displayed text area.
+
+The cookie is stored only in the browser's local storage and is forwarded only to Ultimate Guitar requests. It is not stored by the server or written to logs. Treat it like a password and clear it when finished. Ultimate Guitar may reject expired sessions, CAPTCHA-protected requests, or excessive traffic.
 
 ## Installation
 
