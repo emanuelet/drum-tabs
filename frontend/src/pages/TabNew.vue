@@ -15,9 +15,11 @@ export default defineComponent({
             files: [],
             supportedFormatCommaString,
             isUploading: false,
+            drumAsciiText: "",
+            drumAsciiTitle: "",
+            drumAsciiArtist: "",
             ugQuery: "",
             ugMode: "guitar-pro",
-            ugCookie: localStorage.getItem("ultimateGuitarCookie") || "",
             ugResults: [],
             ugLoading: false,
             ugSelectedTab: null,
@@ -100,6 +102,29 @@ export default defineComponent({
                 this.isUploading = false;
             }
         },
+        async importPastedDrumAscii() {
+            if (!this.drumAsciiText.trim()) {
+                notify({ text: "Paste a drum ASCII tab first", type: "error" });
+                return;
+            }
+            this.isUploading = true;
+            try {
+                const formData = new FormData();
+                formData.append("text", this.drumAsciiText);
+                formData.append("title", this.drumAsciiTitle);
+                formData.append("artist", this.drumAsciiArtist);
+                const res = await fetch(baseURL + "/api/new-drum-tab", { method: "POST", credentials: "include", body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Drum import failed");
+                if (data.warnings?.length) notify({ text: data.warnings.join("; "), type: "warn" });
+                notify({ text: "Drum tab converted to MusicXML", type: "success" });
+                this.$router.push(`/tab/${data.id}`);
+            } catch (err) {
+                notify({ text: `Drum import error: ${err.message}`, type: "error" });
+            } finally {
+                this.isUploading = false;
+            }
+        },
         dropzoneError(err) {
             console.log(err);
             notify({ text: err.type || "Dropzone error", type: "error" });
@@ -132,17 +157,14 @@ export default defineComponent({
         async searchUltimateGuitar() {
             this.ugError = "";
             this.ugResults = [];
-            if (!this.ugCookie.trim()) {
-                this.ugError = "Paste your Ultimate Guitar Cookie header first.";
-                return;
-            }
-            localStorage.setItem("ultimateGuitarCookie", this.ugCookie.trim());
+            const cookie = this.getUltimateGuitarCookie();
+            if (!cookie) return;
             this.ugLoading = true;
             try {
                 const params = new URLSearchParams({ query: this.ugQuery, mode: this.ugMode });
                 const res = await fetch(baseURL + `/api/ultimate-guitar/search?${params}`, {
                     credentials: "include",
-                    headers: { "X-Ultimate-Guitar-Cookie": this.ugCookie.trim() },
+                    headers: { "X-Ultimate-Guitar-Cookie": cookie },
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.msg || "Ultimate Guitar search failed");
@@ -155,12 +177,14 @@ export default defineComponent({
         },
         async openUltimateGuitarResult(result) {
             this.ugError = "";
+            const cookie = this.getUltimateGuitarCookie();
+            if (!cookie) return;
             this.ugSelectedTab = { ...result, loading: true };
             try {
                 const params = new URLSearchParams({ url: result.url });
                 const res = await fetch(baseURL + `/api/ultimate-guitar/tab?${params}`, {
                     credentials: "include",
-                    headers: { "X-Ultimate-Guitar-Cookie": this.ugCookie.trim() },
+                    headers: { "X-Ultimate-Guitar-Cookie": cookie },
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.msg || "Could not load tab");
@@ -177,11 +201,13 @@ export default defineComponent({
         async importUltimateGuitarResult() {
             const tab = this.ugSelectedTab;
             if (!tab?.downloadUrl) return;
+            const cookie = this.getUltimateGuitarCookie();
+            if (!cookie) return;
             this.isUploading = true;
             try {
                 const res = await fetch(baseURL + `/api/ultimate-guitar/download?url=${encodeURIComponent(tab.downloadUrl)}`, {
                     credentials: "include",
-                    headers: { "X-Ultimate-Guitar-Cookie": this.ugCookie.trim() },
+                    headers: { "X-Ultimate-Guitar-Cookie": cookie },
                 });
                 if (!res.ok) throw new Error((await res.json()).msg || "Download failed");
                 const blob = await res.blob();
@@ -203,9 +229,13 @@ export default defineComponent({
                 this.isUploading = false;
             }
         },
-        clearUltimateGuitarCookie() {
-            this.ugCookie = "";
-            localStorage.removeItem("ultimateGuitarCookie");
+        getUltimateGuitarCookie() {
+            const cookie = localStorage.getItem("ultimateGuitarCookie")?.trim();
+            if (!cookie) {
+                this.ugError = "Ultimate Guitar cookie missing. Add it in Settings.";
+                return null;
+            }
+            return cookie;
         },
     },
 });
@@ -241,12 +271,19 @@ export default defineComponent({
         >
             Import Selected Drum ASCII as MusicXML
         </button>
+        <section class="mt-5">
+            <h2>Paste Drum ASCII</h2>
+            <textarea v-model="drumAsciiText" class="form-control mb-2" rows="10" placeholder="Paste drum ASCII tab here"></textarea>
+            <div class="row g-2">
+                <div class="col"><input v-model="drumAsciiTitle" class="form-control" placeholder="Title (optional)" /></div>
+                <div class="col"><input v-model="drumAsciiArtist" class="form-control" placeholder="Artist (optional)" /></div>
+                <div class="col-auto"><button class="btn btn-outline-primary" :disabled="isUploading" @click="importPastedDrumAscii">Import as MusicXML</button></div>
+            </div>
+        </section>
         <section class="ultimate-guitar mt-5">
             <h2>Ultimate Guitar</h2>
-            <p class="text-secondary">Paste the Cookie header from your browser. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
-            <input v-model="ugCookie" type="password" class="form-control mb-2" placeholder="Ultimate Guitar Cookie header" autocomplete="off" />
+            <p class="text-secondary">Configure the Cookie header in <router-link :to="{ name: 'settings' }">Settings</router-link>. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
             <div class="d-flex gap-2 mb-3">
-                <button class="btn btn-outline-secondary" @click="clearUltimateGuitarCookie">Clear cookie</button>
                 <input v-model="ugQuery" class="form-control" placeholder="Artist or song" @keyup.enter="searchUltimateGuitar" />
                 <select v-model="ugMode" class="form-select">
                     <option value="guitar-pro">Guitar Pro with drums</option>
@@ -275,6 +312,9 @@ export default defineComponent({
             </li>
             <li>
                 <a href="#" @click.prevent='createEmpty("guitar")'>Create Empty Guitar Tab</a>
+            </li>
+            <li>
+                <a href="#" @click.prevent='createEmpty("drum")'>Create Empty Drum Tab</a>
             </li>
         </ul>
 

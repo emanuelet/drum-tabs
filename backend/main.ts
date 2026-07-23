@@ -205,13 +205,21 @@ export async function main() {
             await checkLogin(c);
             const form = await c.req.formData();
             const file = form.get("file");
-            if (!(file instanceof File)) throw new Error("No file uploaded");
-            const parsed = parseDrumTab(await file.text());
+            const text = form.get("text");
+            let content: string;
+            if (file instanceof File) {
+                content = await file.text();
+            } else {
+                if (typeof text !== "string" || !text.trim()) throw new Error("No drum tab uploaded or pasted");
+                content = text;
+            }
+            const parsed = parseDrumTab(content);
             const titleValue = form.get("title");
             const artistValue = form.get("artist");
-            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || file.name.replace(/\.txt$/i, "");
+            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || (file instanceof File ? file.name.replace(/\.txt$/i, "") : "Untitled drum tab");
             const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
-            const id = await createTab(new TextEncoder().encode(toMusicXml({ ...parsed, title, artist })), "musicxml", title, artist, file.name);
+            const originalFilename = file instanceof File ? file.name : "drum-tab.txt";
+            const id = await createTab(new TextEncoder().encode(toMusicXml({ ...parsed, title, artist })), "musicxml", title, artist, originalFilename);
             return c.json({ ok: true, id, warnings: parsed.warnings });
         } catch (e) {
             return generalError(c, e);
@@ -260,6 +268,7 @@ export async function main() {
             const templateTypeList: Record<string, string> = {
                 bass: "./extra/empty-bass.gp",
                 guitar: "./extra/empty-guitar.gp",
+                drum: "./extra/empty-drums.musicxml",
             };
 
             const type = c.req.param("type");

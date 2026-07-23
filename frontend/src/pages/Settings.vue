@@ -24,6 +24,7 @@ export default defineComponent({
                 toolbarAutoHide: false,
             },
             isProcessing: false,
+            ultimateGuitarCookie: localStorage.getItem("ultimateGuitarCookie") || "",
         };
     },
     mounted() {
@@ -103,6 +104,14 @@ export default defineComponent({
                 successMessage("Reset to default settings successfully");
             } catch (e) {
                 generalError(e);
+            }
+        },
+        saveUltimateGuitarCookie() {
+            const cookie = this.ultimateGuitarCookie.trim();
+            if (cookie) {
+                localStorage.setItem("ultimateGuitarCookie", cookie);
+            } else {
+                localStorage.removeItem("ultimateGuitarCookie");
             }
         },
     },
@@ -225,6 +234,14 @@ export default defineComponent({
                 <option :value="false">No</option>
                 <option :value="true">Yes</option>
             </select>
+        </div>
+
+        <h2 class="mt-5 mb-4">Ultimate Guitar</h2>
+
+        <div class="mb-3">
+            <label for="ultimateGuitarCookie" class="form-label">Cookie header</label>
+            <input id="ultimateGuitarCookie" v-model="ultimateGuitarCookie" type="password" class="form-control" autocomplete="off" @change="saveUltimateGuitarCookie" />
+            <div class="form-text">Stored only in this browser and sent only with Ultimate Guitar requests.</div>
         </div>
 
         <h2 class="mt-5 mb-4">Others</h2>
