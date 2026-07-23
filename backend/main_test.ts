@@ -189,6 +189,21 @@ Deno.test({
         });
         assertEquals(resFile.status, 200);
         await resFile.body?.cancel();
+
+        const form = new FormData();
+        form.set("title", "Imported Drums");
+        form.set("text", "HH|x-------x-------|\nSN|----o-----------|\nB |o-------o-------|");
+        const drumImport = await fetch(`${baseURL}/api/new-drum-tab`, {
+            method: "POST",
+            headers: { Cookie: cookiePair },
+            body: form,
+        });
+        assertEquals(drumImport.status, 200);
+        const drumImportJson = await drumImport.json();
+        const importedConfig = await getConfigJSON(drumImportJson.id);
+        assertExists(importedConfig);
+        assertEquals(importedConfig.tab.filename.endsWith(".gp"), true);
+        assertEquals(importedConfig.tab.originalFilename, "drum-tab.gp");
     },
 });
 

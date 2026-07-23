@@ -10,7 +10,7 @@ import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getS
 import * as path from "@std/path";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
 import { parseDrumTab } from "./drum_parser.ts";
-import { toMusicXml } from "./drum_musicxml.ts";
+import { toGp7 } from "./drum_alphatex.ts";
 import {
     addAudio,
     addYoutube,
@@ -218,8 +218,8 @@ export async function main() {
             const artistValue = form.get("artist");
             const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || (file instanceof File ? file.name.replace(/\.txt$/i, "") : "Untitled drum tab");
             const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
-            const originalFilename = file instanceof File ? file.name : "drum-tab.txt";
-            const id = await createTab(new TextEncoder().encode(toMusicXml({ ...parsed, title, artist })), "musicxml", title, artist, originalFilename);
+            const originalFilename = `${file instanceof File ? file.name.replace(/\.[^.]+$/, "") : "drum-tab"}.gp`;
+            const id = await createTab(toGp7({ ...parsed, title, artist }), "gp", title, artist, originalFilename);
             return c.json({ ok: true, id, warnings: parsed.warnings });
         } catch (e) {
             return generalError(c, e);

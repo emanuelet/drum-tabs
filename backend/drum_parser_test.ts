@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert@^1.0.17";
+import { toDrumAlphaTex, toGp7 } from "./drum_alphatex.ts";
 import { parseDrumTab } from "./drum_parser.ts";
 import { toMusicXml } from "./drum_musicxml.ts";
 
@@ -31,6 +32,18 @@ Deno.test("emits percussion MusicXML", () => {
     assert(xml.includes("closed-hi-hat"));
     assert(xml.includes("<divisions>16</divisions>"));
     assert(!xml.includes("<backup>"));
+});
+
+Deno.test("converts ASCII columns to valid percussion alphaTex and GP7", () => {
+    const tab = parseDrumTab("Title: Pulse\nArtist: Test\nTempo: 140\nHH|x-------x-------|\nSN|----o-----------|\nB |o-------o-------|");
+    const alphaTex = toDrumAlphaTex(tab);
+    const gp = toGp7(tab);
+    assert(alphaTex.includes('\\track "Drums" \\instrument percussion \\clef neutral \\articulation defaults'));
+    assert(alphaTex.includes("(HiHatClosed KickHit).16"));
+    assert(alphaTex.includes("SnareHit.16"));
+    assertEquals((alphaTex.match(/\.16/g) ?? []).length, 16);
+    assertEquals(new TextDecoder().decode(gp.subarray(0, 2)), "PK");
+    assert(gp.length > 1000);
 });
 
 Deno.test("normalizes slots, groups chords, completes voices, and emits tempo", () => {
