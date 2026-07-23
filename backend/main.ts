@@ -446,6 +446,29 @@ export async function main() {
         }
     });
 
+    // Credentials remain server-side; the browser only receives search results.
+    app.get("/api/youtube-suggestions", async (c) => {
+        try {
+            await checkLogin(c);
+            const query = c.req.query("q")?.trim();
+            if (!query || query.length > 200) throw new Error("Search query must be between 1 and 200 characters");
+
+            const username = Deno.env.get("YATTEE_USERNAME");
+            const password = Deno.env.get("YATTEE_PASSWORD");
+            if (!username || !password) throw new Error("Yattee search is not configured");
+
+            const url = new URL("/api/v1/search", Deno.env.get("YATTEE_BASE_URL") || "https://yattee.etonello.work");
+            url.searchParams.set("q", query);
+            url.searchParams.set("type", "video");
+            const response = await fetch(url, { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } });
+            if (!response.ok) throw new Error(`Yattee search failed (${response.status})`);
+            const results = await response.json() as { videoId?: string }[];
+            return c.json({ ok: true, videos: results.filter((video) => video.videoId).slice(0, 10) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
     // Serve audio file
     app.get("/api/tab/:id/audio/:filename", async (c) => {
         try {
