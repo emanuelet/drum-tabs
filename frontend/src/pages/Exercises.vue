@@ -5,6 +5,29 @@ import { notify } from "@kyvg/vue3-notification";
 
 const alphaTab = await import("@coderline/alphatab");
 
+function splitExerciseTracks(alphaTex, title) {
+    const lines = alphaTex.split("\n");
+    const marker = /^\s*%\s*---\s*(.*?)\s*---\s*$/;
+    const header = [];
+    const tracks = [];
+    let current;
+
+    for (const line of lines) {
+        const match = line.match(marker);
+        if (match) {
+            current = { title: match[1], lines: [] };
+            tracks.push(current);
+        } else if (current) {
+            current.lines.push(line);
+        } else {
+            header.push(line);
+        }
+    }
+
+    if (tracks.length === 0) return [{ title, alphaTex }];
+    return tracks.map((track) => ({ title: track.title, alphaTex: [...header, ...track.lines].join("\n") }));
+}
+
 export default defineComponent({
     data() {
         return {
@@ -18,6 +41,8 @@ export default defineComponent({
             setting: getSetting(),
             searchQuery: "",
             alphaTex: "",
+            editingExercise: null,
+            selectedTrackIndex: 0,
             saving: false,
             ready: false,
         };
@@ -25,6 +50,10 @@ export default defineComponent({
     computed: {
         favoriteExercises() {
             return this.exercises.filter((exercise) => exercise.fav);
+        },
+        exerciseTracks() {
+            if (!this.selected) return [];
+            return splitExerciseTracks(this.selected.alphaTex, this.selected.title);
         },
         filteredExercises() {
             const query = this.searchQuery.trim().toLowerCase();
@@ -38,7 +67,7 @@ export default defineComponent({
             resources = { ...resources, staffLineColor: "#6D6D6D", barSeparatorColor: "#6D6D6D", mainGlyphColor: "#A4A4A4", secondaryGlyphColor: "#A4A4A4", scoreInfoColor: "#A3A3A3" };
         }
         this.api = new alphaTab.AlphaTabApi(this.$refs.score, {
-            core: { fontDirectory: "/font/", engine: "html5" },
+            core: { fontDirectory: "/font/", engine: "svg" },
             player: { enablePlayer: true, enableCursor: true, soundFont: "/soundfont/sonivox.sf2", playerMode: alphaTab.PlayerMode.EnabledSynthesizer },
             notation: { elements: { scoreTitle: false, scoreSubTitle: false, scoreArtist: false } },
             display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
@@ -62,12 +91,21 @@ export default defineComponent({
     methods: {
         loadExercise() {
             if (!this.selected || !this.api) return;
-            this.playing = false;
             this.tempo = this.selected.tempo;
-            this.api.tex(this.selected.alphaTex);
+            this.loadSelectedTrack();
+        },
+        loadSelectedTrack() {
+            if (!this.selected || !this.api) return;
+            this.playing = false;
+            const isSectionedExercise = this.exerciseTracks.length > 1;
+            this.api.settings.display.barsPerRow = isSectionedExercise ? 2 : -1;
+            this.api.settings.display.stretchForce = isSectionedExercise ? 1.35 : 1;
+            this.api.updateSettings();
+            this.api.tex(this.exerciseTracks[this.selectedTrackIndex].alphaTex);
         },
         selectExercise(exercise) {
             this.selected = exercise;
+            this.selectedTrackIndex = 0;
             this.loadExercise();
         },
         playPause() {
@@ -88,7 +126,8 @@ export default defineComponent({
             }
             this.saving = true;
             try {
-                const res = await fetch(baseURL + "/api/exercises", {
+                const url = this.editingExercise ? `/api/exercises/${this.editingExercise.id}` : "/api/exercises";
+                const res = await fetch(baseURL + url, {
                     method: "POST",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -96,8 +135,11 @@ export default defineComponent({
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.msg || "Failed to save exercise");
-                this.exercises = [...this.exercises, data.exercise];
+                this.exercises = this.editingExercise
+                    ? this.exercises.map((exercise) => exercise.id === data.exercise.id ? data.exercise : exercise)
+                    : [...this.exercises, data.exercise];
                 this.alphaTex = "";
+                this.editingExercise = null;
                 this.selectExercise(data.exercise);
                 this.$refs.addDialog.close();
                 notify({ text: "Exercise saved", type: "success" });
@@ -108,6 +150,13 @@ export default defineComponent({
             }
         },
         openAddDialog() {
+            this.editingExercise = null;
+            this.alphaTex = "";
+            this.$refs.addDialog.showModal();
+        },
+        openEditDialog(exercise) {
+            this.editingExercise = exercise;
+            this.alphaTex = exercise.alphaTex;
             this.$refs.addDialog.showModal();
         },
         closeAddDialog() {
@@ -128,11 +177,28 @@ export default defineComponent({
                 notify({ text: error.message || "Failed to update favorite", type: "error" });
             }
         },
+        async deleteExercise(exercise) {
+            if (!confirm(`Delete "${exercise.title}"?`)) return;
+            try {
+                const res = await fetch(baseURL + `/api/exercises/${exercise.id}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Failed to delete exercise");
+                this.exercises = this.exercises.filter((item) => item.id !== exercise.id);
+                if (this.selected?.id === exercise.id) this.selectExercise(this.exercises[0] || null);
+                notify({ text: "Exercise deleted", type: "success" });
+            } catch (error) {
+                notify({ text: error.message || "Failed to delete exercise", type: "error" });
+            }
+        },
     },
     watch: {
         tempo: "updatePlayback",
         metronome: "updatePlayback",
         looping: "updatePlayback",
+        selectedTrackIndex: "loadSelectedTrack",
     },
 });
 </script>
@@ -147,9 +213,10 @@ export default defineComponent({
         <section class="player" :class="{ light: setting.scoreColor === 'light' }">
             <div class="controls">
                 <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
-                <label>Tempo <input v-model.number="tempo" :disabled="!selected" type="number" min="30" max="240" /> BPM</label>
+                <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
                 <label><input v-model="metronome" type="checkbox" /> Metronome</label>
                 <label><input v-model="looping" type="checkbox" /> Loop</label>
+                <label v-if="exerciseTracks.length > 1" class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
             </div>
             <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
             <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
@@ -186,13 +253,15 @@ export default defineComponent({
                         <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small>
                     </button>
                     <button class="btn btn-sm" :class="exercise.fav ? 'btn-outline-warning' : 'btn-outline-secondary'" type="button" @click="toggleFav(exercise)">{{ exercise.fav ? "Unfavorite" : "Favorite" }}</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @click="openEditDialog(exercise)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" @click="deleteExercise(exercise)">Delete</button>
                 </article>
             </div>
             <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
         </section>
         <dialog ref="addDialog" class="add-dialog">
             <form @submit.prevent="saveExercise">
-                <div class="dialog-heading"><h2>Add exercise</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
+                <div class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
                 <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>. The subtitle is optional.</p>
                 <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here"></textarea>
                 <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
@@ -317,6 +386,22 @@ header {
 }
 .controls input[type="number"] {
     width: 70px;
+}
+.tempo-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.tempo-control input[type="range"] {
+    width: min(220px, 42vw);
+}
+.tempo-control output {
+    min-width: 58px;
+}
+.track-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .score {
     min-height: 260px;
