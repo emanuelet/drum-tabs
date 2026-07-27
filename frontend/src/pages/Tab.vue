@@ -52,6 +52,9 @@ export default defineComponent({
             enableBackingTrack: true,
             isLooping: false,
             speed: 100,
+            speedMarks: [25, 50, 75, 100, 125, 150, 175],
+            tempo: 120,
+            showSpeedSelector: false,
             ready: false,
             selectedTrack: 0,
             soloTrackID: -1,
@@ -111,6 +114,19 @@ export default defineComponent({
             } else {
                 return undefined;
             }
+        },
+
+        bpm() {
+            return Math.round(this.tempo * this.speed / 100);
+        },
+
+        audioSelectionLabel() {
+            if (this.currentAudio === "synth") return "Synth";
+            if (this.currentAudio === "none") return "Mute";
+            if (this.currentAudio === "backingTrack") return "Backing Track";
+            if (this.currentAudio.startsWith("youtube-")) return "Youtube";
+            if (this.currentAudio.startsWith("audio-")) return "Audio";
+            return "Audio";
         },
     },
 
@@ -402,6 +418,15 @@ export default defineComponent({
         this.socket?.disconnect();
     },
     methods: {
+        adjustBpm(amount) {
+            const nextBpm = Math.max(Math.ceil(this.tempo * 0.2), Math.min(Math.floor(this.tempo * 2), this.bpm + amount));
+            this.speed = Math.round(nextBpm / this.tempo * 100);
+        },
+
+        speedMarkPosition(mark) {
+            return `${(mark - 20) / 180 * 100}%`;
+        },
+
         async load(trackID) {
             if (this.api) {
                 this.destroyContainer();
@@ -691,6 +716,7 @@ export default defineComponent({
                     this.isLooping = this.getConfig("isLooping", false);
 
                     // Speed
+                    this.tempo = score.masterBars[0]?.tempoAutomations[0]?.value ?? 120;
                     this.speed = 100;
                     this.speed = this.getConfig("speed", 100);
 
@@ -1478,10 +1504,11 @@ export default defineComponent({
         <div class="toolbar" :class='{ "auto-hide": setting.toolbarAutoHide }'>
             <div class="scroll">
                 <div class="track-selector selector" ref="trackSelector">
-                    <div class="button" @click='showList("track")'>
-                        <span v-if="tracks.length > 0">{{ tracks[selectedTrack].name }}</span>
+                    <button class="button" type="button" @click='showList("track")' :aria-expanded="showTrackList">
+                        <span v-if="tracks.length > 0">Tracks: {{ tracks[selectedTrack].name }}</span>
                         <span v-else>Loading...</span>
-                    </div>
+                        <font-awesome-icon :icon='["fas", "caret-down"]' />
+                    </button>
                 </div>
 
                 <div class="drum-notation-selector" v-if="isDrum()">
@@ -1493,28 +1520,32 @@ export default defineComponent({
                         <strong class="drum-notation-title">DRUMSET</strong>
                         <div class="drum-notation-groups">
                             <div class="drum-notation-group bass">
-                                <span>Bass drum</span><small>Normal</small><i class="drum-symbol note"></i>
+                                <span>Bass drum</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 38c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
                             </div>
                             <div class="drum-notation-group snare">
-                                <span>Snare</span><small>Normal</small><i class="drum-symbol note"></i>
+                                <span>Snare</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 26c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
                             </div>
                             <div class="drum-notation-group hihat">
-                                <span>Hi Hat</span><small>Closed</small><small>Open</small><small>Foot</small><i class="drum-symbol x">×</i><i class="drum-symbol circle-x">⊗</i><i class="drum-symbol foot">×</i>
+                                <span>Hi Hat</span><small>Closed</small><small>Open</small><small>Foot</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 1-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg><svg viewBox="0 0 28 60"><circle class="drum-glyph" cx="14" cy="1" r="6" /><path class="drum-glyph" d="m10-3 8 8m0-8-8 8" /></svg><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 55-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg>
                             </div>
                             <div class="drum-notation-group tom">
-                                <span>Tom</span><small>Very low</small><i class="drum-symbol note"></i>
+                                <span>Tom</span><small>Floor</small><small>Very low</small><small>High</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 8c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
                             </div>
                             <div class="drum-notation-group crash">
-                                <span>Crash</span><small>Mid</small><small>High</small><i class="drum-symbol x">×</i><i class="drum-symbol x">×</i>
+                                <span>Crash</span><small>High</small><svg viewBox="0 0 28 60"><path class="drum-ledger" d="M6-11h16" /><path class="drum-glyph" d="m14-11-5-4 2-2 4 4 4-4 2 2-5 4 5 4-2 2-4-4-4 4-2-2z" /></svg>
+                            </div>
+                            <div class="drum-notation-group ride">
+                                <span>Ride</span><small>Cymbal</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 7-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="audio-selector selector" ref="audioSelector">
-                    <div class="button" @click='showList("audio")'>
-                        Audio
-                    </div>
+                    <button class="button" type="button" @click='showList("audio")' :aria-expanded="showAudioList">
+                        {{ audioSelectionLabel }}
+                        <font-awesome-icon :icon='["fas", "caret-down"]' />
+                    </button>
                 </div>
 
                 <button class="btn btn-warning" @click="playFromHighlightedRange()" v-if="playbackRange">
@@ -1546,24 +1577,23 @@ export default defineComponent({
                 </button>
 
                 <div class="speed-selector">
+                    <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
+                        Speed: {{ bpm }} BPM
+                    </button>
+                    <div class="speed-selector-popover" v-if="showSpeedSelector">
                     <div class="speed-selector-header">
-                        <button type="button" aria-label="Decrease playback speed" @click="speed = Math.max(20, speed - 1)">−</button>
-                        <strong>{{ speed }}%</strong>
-                        <button type="button" aria-label="Increase playback speed" @click="speed = Math.min(200, speed + 1)">+</button>
+                        <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
+                        <strong>{{ bpm }} BPM</strong>
+                        <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
                     </div>
                     <div class="speed-scale">
-                        <span class="speed-mark mark-25">25</span>
-                        <span class="speed-mark mark-50">50</span>
-                        <span class="speed-mark mark-75">75</span>
-                        <span class="speed-mark mark-100">100</span>
-                        <span class="speed-mark mark-125">125</span>
-                        <span class="speed-mark mark-150">150</span>
-                        <span class="speed-mark mark-175">175</span>
+                        <span v-for="mark in speedMarks" :key="mark" class="speed-mark" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }">{{ mark }}</span>
                         <div class="speed-ticks" aria-hidden="true">
-                            <i v-for="tick in 31" :key="tick" :class="{ major: tick % 5 === 0 }"></i>
+                            <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
                         </div>
-                        <input v-model.number="speed" type="range" min="20" max="200" step="1" aria-label="Playback speed" />
+                        <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
                         <span class="speed-unit">%</span>
+                    </div>
                     </div>
                 </div>
 
@@ -1701,7 +1731,7 @@ $youtube-height: 200px;
         display: flex;
         align-items: center;
         flex-grow: 4;
-        column-gap: 10px;
+        column-gap: 16px;
 
         .btn-edit {
             flex-grow: 1;
@@ -1782,9 +1812,14 @@ $padding: 20px;
 .selector {
     .button {
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         padding: 10px 15px;
         border-radius: 3px;
         background-color: $color;
+        color: inherit;
+        border: 0;
         user-select: none;
         transition: background-color 0.2s;
         white-space: nowrap;
@@ -1877,12 +1912,17 @@ $padding: 20px;
     bottom: calc(100% + 10px);
     left: 0;
     z-index: 2;
-    width: min(510px, calc(100vw - 32px));
+    width: min(650px, calc(100vw - 32px));
     padding: 14px 20px 20px;
     color: #d8d8dc;
-    background: #26262d;
+    background: #262d35;
     border-radius: 8px 8px 0 0;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.main.light .drum-notation-tooltip {
+    color: #465467;
+    background: #fff;
 }
 
 .drum-notation-title {
@@ -1895,7 +1935,7 @@ $padding: 20px;
 
 .drum-notation-groups {
     display: grid;
-    grid-template-columns: 1fr 1fr 2.2fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 2.2fr 2.2fr 1fr 1fr;
     gap: 20px;
     margin-top: 7px;
 }
@@ -1940,6 +1980,21 @@ $padding: 20px;
         font-weight: 700;
     }
 
+    svg {
+        display: block;
+        width: 28px;
+        height: 60px;
+        justify-self: center;
+        overflow: visible;
+        fill: #d8d8dc;
+        stroke: #d8d8dc;
+        stroke-width: 1.2;
+    }
+
+    .drum-note { stroke: none; }
+    .drum-glyph { fill: none; }
+    .drum-ledger { fill: none; stroke-width: 1; }
+
     .note::after {
         position: absolute;
         top: 28px;
@@ -1957,8 +2012,12 @@ $padding: 20px;
     .foot { align-self: end; margin-top: 35px; }
 }
 
+.drum-notation-group.bass,
+.drum-notation-group.snare,
+.drum-notation-group.ride { grid-template-columns: 1fr; }
 .drum-notation-group.hihat { grid-template-columns: repeat(3, 1fr); }
-.drum-notation-group.crash { grid-template-columns: repeat(2, 1fr); }
+.drum-notation-group.tom { grid-template-columns: repeat(3, 1fr); }
+.drum-notation-group.crash { grid-template-columns: 1fr; }
 
 .select-percentage {
     display: flex;
@@ -1973,12 +2032,28 @@ $padding: 20px;
 
 .speed-selector {
     position: relative;
+
+    > .btn {
+        width: 160px;
+    }
+}
+
+.speed-selector-popover {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    z-index: 2;
     width: 370px;
     padding: 12px 18px 22px;
-    color: #465467;
-    background: #fff;
+    color: #d9e0e8;
+    background: #262d35;
     box-shadow: 0 12px 28px rgba(32, 46, 62, 0.14);
     border-radius: 6px;
+}
+
+.main.light .speed-selector-popover {
+    color: #465467;
+    background: #fff;
 }
 
 .speed-selector-header {
@@ -1988,18 +2063,18 @@ $padding: 20px;
     gap: 18px;
     width: 132px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #d7dce1;
+    border-bottom: 1px solid currentColor;
 
     button {
         padding: 0;
-        color: #8390a0;
+        color: inherit;
         font-size: 24px;
         line-height: 1;
         background: none;
         border: 0;
 
         &:hover {
-            color: #465467;
+            color: #65d52f;
         }
     }
 
@@ -2014,7 +2089,8 @@ $padding: 20px;
     position: relative;
     height: 105px;
     margin-top: 24px;
-    margin-inline: 12px;
+    margin-right: 36px;
+    margin-left: 12px;
 
     &::after {
         position: absolute;
@@ -2023,7 +2099,7 @@ $padding: 20px;
         left: 0;
         height: 1px;
         content: "";
-        background: #aab4bf;
+        background: currentColor;
     }
 
     input[type="range"] {
@@ -2092,25 +2168,23 @@ $padding: 20px;
 .speed-mark {
     position: absolute;
     bottom: 48px;
-    color: #8d99a8;
+    color: color-mix(in srgb, currentColor 65%, transparent);
     font-size: 16px;
     transform: translateX(-50%);
-}
 
-.mark-25 { left: 9%; }
-.mark-50 { left: 23%; color: #465467; font-weight: 700; }
-.mark-75 { left: 37%; }
-.mark-100 { left: 51%; }
-.mark-125 { left: 65%; }
-.mark-150 { left: 79%; }
-.mark-175 { left: 93%; }
+    &.active {
+        color: #65d52f;
+        font-weight: 700;
+    }
+}
 
 .speed-unit {
     position: absolute;
-    right: 10px;
-    top: 37px;
+    right: -27px;
+    bottom: 47px;
     font-size: 18px;
     font-weight: 700;
+    color: #65d52f;
 }
 
 .mobile {

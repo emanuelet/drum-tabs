@@ -26,6 +26,12 @@ export default defineComponent({
             ugError: "",
         };
     },
+    computed: {
+        selectedMusicXmlFile() {
+            const file = this.files[0]?.file;
+            return this.files.length === 1 && file && /\.(musicxml|xml)$/i.test(file.name) ? file : null;
+        },
+    },
     methods: {
         async upload() {
             if (this.files.length === 0) {
@@ -79,28 +85,6 @@ export default defineComponent({
 
             // Reset Dropzone
             this.isUploading = false;
-        },
-        async importDrumAscii() {
-            const file = this.files[0]?.file;
-            if (!file || !file.name.toLowerCase().endsWith(".txt")) {
-                notify({ text: "Select one .txt drum tab first", type: "error" });
-                return;
-            }
-            this.isUploading = true;
-            try {
-                const formData = new FormData();
-                formData.append("file", file);
-                const res = await fetch(baseURL + "/api/new-drum-tab", { method: "POST", credentials: "include", body: formData });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.msg || "Drum import failed");
-                if (data.warnings?.length) notify({ text: data.warnings.join("; "), type: "warn" });
-                notify({ text: "Drum tab converted to MusicXML", type: "success" });
-                this.$router.push(`/tab/${data.id}`);
-            } catch (err) {
-                notify({ text: `Drum import error: ${err.message}`, type: "error" });
-            } finally {
-                this.isUploading = false;
-            }
         },
         async importPastedDrumAscii() {
             if (!this.drumAsciiText.trim()) {
@@ -265,11 +249,12 @@ export default defineComponent({
         </button>
 
         <button
-            @click="importDrumAscii"
+            v-if="selectedMusicXmlFile"
+            @click="upload"
             class="btn btn-outline-secondary w-100 mt-2"
             :disabled="isUploading"
         >
-            Import Selected Drum ASCII as MusicXML
+            Import Selected Drum MusicXML
         </button>
         <section class="mt-5">
             <h2>Paste Drum ASCII</h2>
