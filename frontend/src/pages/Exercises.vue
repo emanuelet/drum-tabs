@@ -8,6 +8,7 @@ const alphaTab = await import("@coderline/alphatab");
 function splitExerciseTracks(alphaTex, title) {
     const lines = alphaTex.split("\n");
     const marker = /^\s*%\s*---\s*(.*?)\s*---\s*$/;
+    const lineComment = /^\s*\/\/\s*(.*?)\s*$/;
     const header = [];
     const tracks = [];
     let current;
@@ -17,6 +18,17 @@ function splitExerciseTracks(alphaTex, title) {
         if (match) {
             current = { title: match[1], lines: [] };
             tracks.push(current);
+        } else if (lineComment.test(line)) {
+            const comment = line.match(lineComment)[1];
+            const startsTrack = /^(Pattern|Variation|Exercise)\s+\d+:/i.test(comment);
+            if (startsTrack) {
+                current = { title: comment, lines: [] };
+                tracks.push(current);
+            } else if (current) {
+                current.lines.push(line);
+            } else {
+                header.push(line);
+            }
         } else if (current) {
             current.lines.push(line);
         } else {
@@ -42,6 +54,7 @@ export default defineComponent({
             searchQuery: "",
             alphaTex: "",
             editingExercise: null,
+            alphaTexAnalysis: null,
             selectedTrackIndex: 0,
             saving: false,
             ready: false,
@@ -67,7 +80,7 @@ export default defineComponent({
             resources = { ...resources, staffLineColor: "#6D6D6D", barSeparatorColor: "#6D6D6D", mainGlyphColor: "#A4A4A4", secondaryGlyphColor: "#A4A4A4", scoreInfoColor: "#A3A3A3" };
         }
         this.api = new alphaTab.AlphaTabApi(this.$refs.score, {
-            core: { fontDirectory: "/font/", engine: "svg" },
+            core: { fontDirectory: "/font/", engine: "html5" },
             player: { enablePlayer: true, enableCursor: true, soundFont: "/soundfont/sonivox.sf2", playerMode: alphaTab.PlayerMode.EnabledSynthesizer },
             notation: { elements: { scoreTitle: false, scoreSubTitle: false, scoreArtist: false } },
             display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
@@ -140,8 +153,9 @@ export default defineComponent({
                     : [...this.exercises, data.exercise];
                 this.alphaTex = "";
                 this.editingExercise = null;
+                this.alphaTexAnalysis = null;
                 this.selectExercise(data.exercise);
-                this.$refs.addDialog.close();
+                this.closeAddDialog();
                 notify({ text: "Exercise saved", type: "success" });
             } catch (error) {
                 notify({ text: error.message || "Failed to save exercise", type: "error" });
@@ -152,15 +166,42 @@ export default defineComponent({
         openAddDialog() {
             this.editingExercise = null;
             this.alphaTex = "";
+            this.alphaTexAnalysis = null;
             this.$refs.addDialog.showModal();
         },
         openEditDialog(exercise) {
             this.editingExercise = exercise;
             this.alphaTex = exercise.alphaTex;
             this.$refs.addDialog.showModal();
+            this.analyzeAlphaTex();
         },
         closeAddDialog() {
             this.$refs.addDialog.close();
+        },
+        analyzeAlphaTex() {
+            if (!this.alphaTex.trim()) {
+                this.alphaTexAnalysis = null;
+                return;
+            }
+            try {
+                const parser = new alphaTab.importer.alphaTex.AlphaTexParser(this.alphaTex);
+                parser.read();
+                const diagnostics = [
+                    ...(parser.lexerDiagnostics?.items || parser.lexerDiagnostics || []),
+                    ...(parser.parserDiagnostics?.items || parser.parserDiagnostics || []),
+                ];
+                const errorSeverity = alphaTab.importer.alphaTex.AlphaTexDiagnosticsSeverity.Error;
+                const errors = diagnostics.filter((diagnostic) => diagnostic.severity === errorSeverity);
+                this.alphaTexAnalysis = {
+                    valid: errors.length === 0,
+                    diagnostics: errors.map((diagnostic) => diagnostic.message),
+                    title: this.alphaTex.match(/^\\title\s+"([^"\r\n]+)"/m)?.[1] || "Untitled",
+                    subtitle: this.alphaTex.match(/^\\subtitle\s+"([^"\r\n]+)"/m)?.[1] || "",
+                    tempo: this.alphaTex.match(/^\\tempo\s+(\d+)/m)?.[1] || "Not set",
+                };
+            } catch (error) {
+                this.alphaTexAnalysis = { valid: false, diagnostics: [error.message || "Unable to parse AlphaTex"] };
+            }
         },
         async toggleFav(exercise) {
             try {
@@ -263,7 +304,12 @@ export default defineComponent({
             <form @submit.prevent="saveExercise">
                 <div class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
                 <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>. The subtitle is optional.</p>
-                <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here"></textarea>
+                <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
+                <div v-if="alphaTexAnalysis" class="alphatex-analysis" :class="alphaTexAnalysis.valid ? 'valid' : 'invalid'">
+                    <strong>{{ alphaTexAnalysis.valid ? "Syntax valid" : "Syntax invalid" }}</strong>
+                    <span v-if="alphaTexAnalysis.valid">{{ alphaTexAnalysis.title }}<template v-if="alphaTexAnalysis.subtitle"> - {{ alphaTexAnalysis.subtitle }}</template> · {{ alphaTexAnalysis.tempo }} BPM</span>
+                    <ul v-else><li v-for="diagnostic in alphaTexAnalysis.diagnostics" :key="diagnostic">{{ diagnostic }}</li></ul>
+                </div>
                 <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
             </form>
         </dialog>
@@ -431,6 +477,27 @@ header {
 }
 .add-dialog::backdrop {
     background: rgba(0, 0, 0, .65);
+}
+.alphatex-analysis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+}
+.alphatex-analysis.valid {
+    color: #9dd37c;
+    background: rgba(58, 120, 44, .2);
+}
+.alphatex-analysis.invalid {
+    color: #f1a1a1;
+    background: rgba(130, 45, 45, .2);
+}
+.alphatex-analysis ul {
+    width: 100%;
+    margin: 0;
+    padding-left: 20px;
 }
 .dialog-heading,
 .dialog-actions {
