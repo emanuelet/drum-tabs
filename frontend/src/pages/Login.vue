@@ -58,7 +58,7 @@ export default defineComponent({
         <div class="form">
             <form @submit.prevent="submit">
                 <div style="font-size: 28px; font-weight: bold" class="mb-5 mt-5">
-                    It's MyTabs
+                    Drum Tabs
                 </div>
 
                 <div class="form-floating mt-3">

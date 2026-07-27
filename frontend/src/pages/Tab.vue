@@ -95,6 +95,7 @@ export default defineComponent({
             simpleSyncSecond: -1,
             toolbarAutoHide: false,
             isTextTab: false,
+            showDrumNotation: false,
         };
     },
     computed: {
@@ -1483,6 +1484,33 @@ export default defineComponent({
                     </div>
                 </div>
 
+                <div class="drum-notation-selector" v-if="isDrum()">
+                    <button class="btn btn-secondary" type="button" @click="showDrumNotation = !showDrumNotation" :aria-expanded="showDrumNotation">
+                        <font-awesome-icon :icon='["fas", "drum"]' />
+                        Notation
+                    </button>
+                    <div class="drum-notation-tooltip" v-if="showDrumNotation">
+                        <strong class="drum-notation-title">DRUMSET</strong>
+                        <div class="drum-notation-groups">
+                            <div class="drum-notation-group bass">
+                                <span>Bass drum</span><small>Normal</small><i class="drum-symbol note"></i>
+                            </div>
+                            <div class="drum-notation-group snare">
+                                <span>Snare</span><small>Normal</small><i class="drum-symbol note"></i>
+                            </div>
+                            <div class="drum-notation-group hihat">
+                                <span>Hi Hat</span><small>Closed</small><small>Open</small><small>Foot</small><i class="drum-symbol x">×</i><i class="drum-symbol circle-x">⊗</i><i class="drum-symbol foot">×</i>
+                            </div>
+                            <div class="drum-notation-group tom">
+                                <span>Tom</span><small>Very low</small><i class="drum-symbol note"></i>
+                            </div>
+                            <div class="drum-notation-group crash">
+                                <span>Crash</span><small>Mid</small><small>High</small><i class="drum-symbol x">×</i><i class="drum-symbol x">×</i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="audio-selector selector" ref="audioSelector">
                     <div class="button" @click='showList("audio")'>
                         Audio
@@ -1517,8 +1545,26 @@ export default defineComponent({
                     Metronome
                 </button>
 
-                <div class="select-percentage">
-                    Speed: <input type="number" class="form-control" min="0" max="1000" step="1" v-model="speed" /> (%)
+                <div class="speed-selector">
+                    <div class="speed-selector-header">
+                        <button type="button" aria-label="Decrease playback speed" @click="speed = Math.max(20, speed - 1)">−</button>
+                        <strong>{{ speed }}%</strong>
+                        <button type="button" aria-label="Increase playback speed" @click="speed = Math.min(200, speed + 1)">+</button>
+                    </div>
+                    <div class="speed-scale">
+                        <span class="speed-mark mark-25">25</span>
+                        <span class="speed-mark mark-50">50</span>
+                        <span class="speed-mark mark-75">75</span>
+                        <span class="speed-mark mark-100">100</span>
+                        <span class="speed-mark mark-125">125</span>
+                        <span class="speed-mark mark-150">150</span>
+                        <span class="speed-mark mark-175">175</span>
+                        <div class="speed-ticks" aria-hidden="true">
+                            <i v-for="tick in 31" :key="tick" :class="{ major: tick % 5 === 0 }"></i>
+                        </div>
+                        <input v-model.number="speed" type="range" min="20" max="200" step="1" aria-label="Playback speed" />
+                        <span class="speed-unit">%</span>
+                    </div>
                 </div>
 
                 <div class="btn-edit" v-if="isLoggedIn">
@@ -1822,6 +1868,98 @@ $padding: 20px;
     position: relative;
 }
 
+.drum-notation-selector {
+    position: relative;
+}
+
+.drum-notation-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 0;
+    z-index: 2;
+    width: min(510px, calc(100vw - 32px));
+    padding: 14px 20px 20px;
+    color: #d8d8dc;
+    background: #26262d;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.drum-notation-title {
+    display: block;
+    padding-bottom: 7px;
+    border-bottom: 1px solid #d8d8dc;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+.drum-notation-groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr 2.2fr 1fr 1fr;
+    gap: 20px;
+    margin-top: 7px;
+}
+
+.drum-notation-group {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start;
+    min-width: 0;
+    padding-top: 20px;
+    background: repeating-linear-gradient(to bottom, transparent 0 10px, #696970 10px 11px);
+    background-position: 0 42px;
+    background-repeat: no-repeat;
+    background-size: 100% 56px;
+
+    > span {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: max-content;
+        transform: translateX(-50%);
+        font-size: 13px;
+    }
+
+    > small {
+        position: relative;
+        height: 22px;
+        font-size: 11px;
+        text-align: center;
+    }
+
+    .drum-symbol {
+        position: relative;
+        display: block;
+        height: 56px;
+        grid-column: span 1;
+        margin-top: 2px;
+        text-align: center;
+        font-size: 24px;
+        font-style: normal;
+        font-weight: 700;
+    }
+
+    .note::after {
+        position: absolute;
+        top: 28px;
+        left: 50%;
+        width: 11px;
+        height: 7px;
+        content: "";
+        background: #d8d8dc;
+        border-radius: 50%;
+        transform: translateX(-50%) rotate(-25deg);
+    }
+
+    .x { color: #e2e2e5; }
+    .circle-x { font-size: 21px; }
+    .foot { align-self: end; margin-top: 35px; }
+}
+
+.drum-notation-group.hihat { grid-template-columns: repeat(3, 1fr); }
+.drum-notation-group.crash { grid-template-columns: repeat(2, 1fr); }
+
 .select-percentage {
     display: flex;
     align-items: center;
@@ -1831,6 +1969,148 @@ $padding: 20px;
         min-width: 90px;
         border: 0;
     }
+}
+
+.speed-selector {
+    position: relative;
+    width: 370px;
+    padding: 12px 18px 22px;
+    color: #465467;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(32, 46, 62, 0.14);
+    border-radius: 6px;
+}
+
+.speed-selector-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: 132px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #d7dce1;
+
+    button {
+        padding: 0;
+        color: #8390a0;
+        font-size: 24px;
+        line-height: 1;
+        background: none;
+        border: 0;
+
+        &:hover {
+            color: #465467;
+        }
+    }
+
+    strong {
+        min-width: 56px;
+        text-align: center;
+        font-size: 16px;
+    }
+}
+
+.speed-scale {
+    position: relative;
+    height: 105px;
+    margin-top: 24px;
+    margin-inline: 12px;
+
+    &::after {
+        position: absolute;
+        right: 0;
+        bottom: 16px;
+        left: 0;
+        height: 1px;
+        content: "";
+        background: #aab4bf;
+    }
+
+    input[type="range"] {
+        position: absolute;
+        right: 0;
+        bottom: 7px;
+        left: 0;
+        z-index: 2;
+        width: 100%;
+        margin: 0;
+        appearance: none;
+        background: transparent;
+
+        &::-webkit-slider-runnable-track {
+            height: 18px;
+            background: transparent;
+        }
+
+        &::-webkit-slider-thumb {
+            width: 20px;
+            height: 20px;
+            margin-top: -1px;
+            appearance: none;
+            background: #65d52f;
+            border: 6px solid #344253;
+            border-radius: 50%;
+            box-shadow: 0 3px 8px rgba(25, 35, 48, 0.3);
+        }
+
+        &::-moz-range-track {
+            height: 18px;
+            background: transparent;
+        }
+
+        &::-moz-range-thumb {
+            width: 9px;
+            height: 9px;
+            background: #65d52f;
+            border: 6px solid #344253;
+            border-radius: 50%;
+        }
+    }
+}
+
+.speed-ticks {
+    position: absolute;
+    right: 0;
+    bottom: 16px;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+    height: 12px;
+    pointer-events: none;
+
+    i {
+        width: 1px;
+        height: 8px;
+        background: #aab4bf;
+
+        &.major {
+            height: 16px;
+        }
+    }
+}
+
+.speed-mark {
+    position: absolute;
+    bottom: 48px;
+    color: #8d99a8;
+    font-size: 16px;
+    transform: translateX(-50%);
+}
+
+.mark-25 { left: 9%; }
+.mark-50 { left: 23%; color: #465467; font-weight: 700; }
+.mark-75 { left: 37%; }
+.mark-100 { left: 51%; }
+.mark-125 { left: 65%; }
+.mark-150 { left: 79%; }
+.mark-175 { left: 93%; }
+
+.speed-unit {
+    position: absolute;
+    right: 10px;
+    top: 37px;
+    font-size: 18px;
+    font-weight: 700;
 }
 
 .mobile {
@@ -1863,6 +2143,15 @@ $padding: 20px;
         input {
             width: 100px;
         }
+    }
+
+    .speed-selector {
+        width: min(370px, calc(100vw - 32px));
+    }
+
+    .drum-notation-tooltip {
+        left: 50%;
+        transform: translateX(-50%);
     }
 }
 

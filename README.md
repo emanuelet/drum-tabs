@@ -1,15 +1,13 @@
 <div align="center" width="100%">
-    <img src="./frontend/public/icon.png" width="128" alt="It's MyTabs" />
+    <img src="./frontend/public/icon.png" width="128" alt="Drum Tabs" />
 </div>
 
-# It's MyTabs
+# Drum Tabs
 
-<a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/stars/louislam/its-mytabs?style=flat" /></a>
-<a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/pulls/louislam/its-mytabs" /></a>
-<a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/v/louislam/its-mytabs/latest?label=docker%20image%20ver." /></a>
-<a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/last-commit/louislam/its-mytabs" /></a>
+<a target="_blank" href="https://github.com/emanuelet/drum-tabs"><img src="https://img.shields.io/github/stars/emanuelet/drum-tabs?style=flat" /></a>
+<a target="_blank" href="https://github.com/emanuelet/drum-tabs"><img src="https://img.shields.io/github/last-commit/emanuelet/drum-tabs" /></a>
 
-Open source, web based, self hostable guitar/bass tab viewer and player, similar to Songsterr.
+Drum Tabs is an open source, web based, self-hostable guitar, bass, and drum tab viewer and player, similar to Songsterr.
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/d7859f4a-8ae0-41e2-bdeb-93b900cc0220" />
 <img width="200"  alt="image" src="https://github.com/user-attachments/assets/c980d516-8f6d-4cca-8a59-4a1a4cc75b1b" />
@@ -52,7 +50,7 @@ Tip: Youtube videos may not work on a private ip address (e.g. 192.168.x.x), use
 
 ### Windows (exe)
 
-Download the latest release (its-mytabs-v1.x.x-windows.zip) from [Releases](https://github.com/louislam/its-mytabs/releases/latest) page, unzip it, and run `its-mytabs.exe`.
+Download the latest release (drumtubs-v1.x.x-windows.zip) from the [Releases](https://github.com/emanuelet/drum-tabs/releases/latest) page, unzip it, and run `drumtubs.exe`.
 
 ### Docker Compose
 
@@ -61,7 +59,7 @@ Download the [compose.yaml]() file and put it in an empty folder.
 ```yaml
 services:
     app:
-        image: louislam/its-mytabs:1
+        image: emanuelet/drumtubs:1
         ports:
             # Host Port:Container Port
             - "47777:47777"
@@ -108,7 +106,7 @@ Configure a local MCP client to start it from this repository:
 ### Docker
 
 ```bash
-docker run -d --name its-mytabs -p 47777:47777 -v its-mytabs:/app/data --restart unless-stopped louislam/its-mytabs:1
+docker run -d --name drumtubs -p 47777:47777 -v drumtubs:/app/data --restart unless-stopped emanuelet/drumtubs:1
 ```
 
 Go to `http://localhost:47777` to access the web UI.
@@ -121,8 +119,8 @@ Requirements:
 - Git
 
 ```bash
-git clone https://github.com/louislam/its-mytabs.git
-cd its-mytabs
+git clone https://github.com/emanuelet/drum-tabs.git
+cd drum-tabs
 
 # Check out the latest version from Release page
 git checkout 1.X.X --force

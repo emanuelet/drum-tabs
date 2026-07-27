@@ -1,12 +1,37 @@
 import { serve, ServerType } from "@hono/node-server";
 import { Context, Hono } from "@hono/hono";
 import * as fs from "@std/fs";
-import { auth, checkLogin, getCurrentSession, isFinishSetup, isLoggedIn } from "./auth.ts";
-import { SignUpSchema, SyncRequestSchema, UpdateTabFavSchema, UpdateTabInfoSchema, YoutubeAddDataSchema } from "./zod.ts";
+import {
+    auth,
+    checkLogin,
+    getCurrentSession,
+    isFinishSetup,
+    isLoggedIn,
+} from "./auth.ts";
+import {
+    SignUpSchema,
+    SyncRequestSchema,
+    UpdateTabFavSchema,
+    UpdateTabInfoSchema,
+    YoutubeAddDataSchema,
+} from "./zod.ts";
 import { db, hasUser, isInitDB, kv, migrate } from "./db.ts";
 import { cors } from "@hono/hono/cors";
 import { serveStatic } from "@hono/hono/deno";
-import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getSourceDir, host, isDemoMode, isDev, port, start, tabDir } from "./util.ts";
+import {
+    appVersion,
+    checkFilename,
+    dataDir,
+    devOriginList,
+    getFrontendDir,
+    getSourceDir,
+    host,
+    isDemoMode,
+    isDev,
+    port,
+    start,
+    tabDir,
+} from "./util.ts";
 import * as path from "@std/path";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
 import { parseDrumTab } from "./drum_parser.ts";
@@ -38,12 +63,17 @@ import sanitize from "sanitize-filename";
 import "@std/dotenv/load";
 import { socketIO } from "./socket.ts";
 import * as cheerio from "cheerio";
-import { downloadUltimateGuitarFile, getUltimateGuitarTab, searchUltimateGuitar, UltimateGuitarError } from "./ultimate-guitar.ts";
+import {
+    downloadUltimateGuitarFile,
+    getUltimateGuitarTab,
+    searchUltimateGuitar,
+    UltimateGuitarError,
+} from "./ultimate-guitar.ts";
 
 let httpServer: ServerType;
 
 export async function main() {
-    console.log(`It's MyTabs v${appVersion}`);
+    console.log(`Drum Tabs v${appVersion}`);
 
     if (isInitDB()) {
         console.log("Database initialized.");
@@ -59,21 +89,29 @@ export async function main() {
         // If prod, check if it exists, if not, exit
         if (!fs.existsSync(frontendDir)) {
             if (isDev()) {
-                console.error("You need to build the frontend first. Run `deno task build`.");
+                console.error(
+                    "You need to build the frontend first. Run `deno task build`.",
+                );
             } else {
                 console.error(`${frontendDir} does not exist.`);
-                console.error(`Please run \`deno task setup\` to build ${frontendDir}`);
+                console.error(
+                    `Please run \`deno task setup\` to build ${frontendDir}`,
+                );
             }
             Deno.exit(1);
         }
     }
 
     // Read index.html content
-    const indexHTMLContent = await Deno.readTextFile(path.join(frontendDir, "index.html"));
+    const indexHTMLContent = await Deno.readTextFile(
+        path.join(frontendDir, "index.html"),
+    );
 
     // Inject demo mode flag using cheerio
     const $ = cheerio.load(indexHTMLContent);
-    $("head").append(`<script id="app-config" type="application/json">${JSON.stringify({ isDemo: isDemoMode })}</script>`);
+    $("head").append(
+        `<script id="app-config" type="application/json">${JSON.stringify({ isDemo: isDemoMode })}</script>`,
+    );
     const indexHTML = $.html();
 
     if (isDemoMode) {
@@ -82,30 +120,33 @@ export async function main() {
 
     const app = new Hono();
 
-    httpServer = serve({
-        fetch: app.fetch,
-        port,
-        hostname: host,
-    }, (info) => {
-        let address = info.address;
-        if (address == "0.0.0.0") {
-            address = "localhost";
-        }
-
-        // Print DATA_DIR so it's visible on startup
-        console.log(`Data Dir:`, dataDir);
-
-        const url = `http://${address}:${info.port}`;
-        console.log(`Server running on ${url}`);
-
-        const launchBrowser = Deno.env.get("MYTABS_LAUNCH_BROWSER");
-
-        if (Deno.build.standalone) {
-            if (launchBrowser !== "false") {
-                start(url);
+    httpServer = serve(
+        {
+            fetch: app.fetch,
+            port,
+            hostname: host,
+        },
+        (info) => {
+            let address = info.address;
+            if (address == "0.0.0.0") {
+                address = "localhost";
             }
-        }
-    });
+
+            // Print DATA_DIR so it's visible on startup
+            console.log(`Data Dir:`, dataDir);
+
+            const url = `http://${address}:${info.port}`;
+            console.log(`Server running on ${url}`);
+
+            const launchBrowser = Deno.env.get("MYTABS_LAUNCH_BROWSER");
+
+            if (Deno.build.standalone) {
+                if (launchBrowser !== "false") {
+                    start(url);
+                }
+            }
+        },
+    );
 
     // Socket Controller
     const io = socketIO(httpServer);
@@ -189,7 +230,13 @@ export async function main() {
             artist = artist.trim();
 
             const arrayBuffer = await file.arrayBuffer();
-            let id = await createTab(new Uint8Array(arrayBuffer), ext, title, artist, fileName);
+            let id = await createTab(
+                new Uint8Array(arrayBuffer),
+                ext,
+                title,
+                artist,
+                fileName,
+            );
 
             return c.json({
                 ok: true,
@@ -210,16 +257,32 @@ export async function main() {
             if (file instanceof File) {
                 content = await file.text();
             } else {
-                if (typeof text !== "string" || !text.trim()) throw new Error("No drum tab uploaded or pasted");
+                if (typeof text !== "string" || !text.trim())
+                    throw new Error("No drum tab uploaded or pasted");
                 content = text;
             }
             const parsed = parseDrumTab(content);
             const titleValue = form.get("title");
             const artistValue = form.get("artist");
-            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title || (file instanceof File ? file.name.replace(/\.txt$/i, "") : "Untitled drum tab");
-            const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
+            const title =
+                typeof titleValue === "string" && titleValue.trim()
+                    ? titleValue.trim()
+                    : parsed.title ||
+                      (file instanceof File
+                          ? file.name.replace(/\.txt$/i, "")
+                          : "Untitled drum tab");
+            const artist =
+                typeof artistValue === "string"
+                    ? artistValue.trim()
+                    : parsed.artist || "";
             const originalFilename = `${file instanceof File ? file.name.replace(/\.[^.]+$/, "") : "drum-tab"}.gp`;
-            const id = await createTab(toGp7({ ...parsed, title, artist }), "gp", title, artist, originalFilename);
+            const id = await createTab(
+                toGp7({ ...parsed, title, artist }),
+                "gp",
+                title,
+                artist,
+                originalFilename,
+            );
             return c.json({ ok: true, id, warnings: parsed.warnings });
         } catch (e) {
             return generalError(c, e);
@@ -230,9 +293,17 @@ export async function main() {
         try {
             await checkLogin(c);
             const query = c.req.query("query") || "";
-            const mode = c.req.query("mode") === "ascii-drums" ? "ascii-drums" : "guitar-pro";
+            const mode =
+                c.req.query("mode") === "ascii-drums"
+                    ? "ascii-drums"
+                    : "guitar-pro";
             const page = Number.parseInt(c.req.query("page") || "1", 10);
-            const results = await searchUltimateGuitar(query, mode, c.req.header("x-ultimate-guitar-cookie") || "", page);
+            const results = await searchUltimateGuitar(
+                query,
+                mode,
+                c.req.header("x-ultimate-guitar-cookie") || "",
+                page,
+            );
             return c.json({ ok: true, results });
         } catch (e) {
             return ultimateGuitarError(c, e);
@@ -243,7 +314,10 @@ export async function main() {
         try {
             await checkLogin(c);
             const url = c.req.query("url") || "";
-            const tab = await getUltimateGuitarTab(url, c.req.header("x-ultimate-guitar-cookie") || "");
+            const tab = await getUltimateGuitarTab(
+                url,
+                c.req.header("x-ultimate-guitar-cookie") || "",
+            );
             return c.json({ ok: true, tab });
         } catch (e) {
             return ultimateGuitarError(c, e);
@@ -253,8 +327,18 @@ export async function main() {
     app.get("/api/ultimate-guitar/download", async (c) => {
         try {
             await checkLogin(c);
-            const response = await downloadUltimateGuitarFile(c.req.query("url") || "", c.req.header("x-ultimate-guitar-cookie") || "");
-            return new Response(response.body, { status: 200, headers: { "Content-Type": response.headers.get("content-type") || "application/octet-stream" } });
+            const response = await downloadUltimateGuitarFile(
+                c.req.query("url") || "",
+                c.req.header("x-ultimate-guitar-cookie") || "",
+            );
+            return new Response(response.body, {
+                status: 200,
+                headers: {
+                    "Content-Type":
+                        response.headers.get("content-type") ||
+                        "application/octet-stream",
+                },
+            });
         } catch (e) {
             return ultimateGuitarError(c, e);
         }
@@ -284,7 +368,13 @@ export async function main() {
             const title = "Empty Tab";
             const artist = "";
 
-            const id = await createTab(bytes, ext, title, artist, path.basename(templatePath));
+            const id = await createTab(
+                bytes,
+                ext,
+                title,
+                artist,
+                path.basename(templatePath),
+            );
 
             // Append the id to the title
             await updateConfigJSON(id, async (config) => {
@@ -329,11 +419,14 @@ export async function main() {
 
             config = await fixMissingTab(config);
 
-            const filePath = (await isLoggedIn(c)) ? getTabFullFilePath(config.tab) : "";
+            const filePath = (await isLoggedIn(c))
+                ? getTabFullFilePath(config.tab)
+                : "";
 
             return c.json({
                 ok: true,
-                showOpenButtons: Deno.build.standalone && Deno.build.os === "windows",
+                showOpenButtons:
+                    Deno.build.standalone && Deno.build.os === "windows",
                 tab: config.tab,
                 youtubeList: config.youtube,
                 audioList: config.audio,
@@ -515,19 +608,35 @@ export async function main() {
         try {
             await checkLogin(c);
             const query = c.req.query("q")?.trim();
-            if (!query || query.length > 200) throw new Error("Search query must be between 1 and 200 characters");
+            if (!query || query.length > 200)
+                throw new Error(
+                    "Search query must be between 1 and 200 characters",
+                );
 
             const username = Deno.env.get("YATTEE_USERNAME");
             const password = Deno.env.get("YATTEE_PASSWORD");
-            if (!username || !password) throw new Error("Yattee search is not configured");
+            if (!username || !password)
+                throw new Error("Yattee search is not configured");
 
-            const url = new URL("/api/v1/search", Deno.env.get("YATTEE_BASE_URL") || "https://yattee.etonello.work");
+            const url = new URL(
+                "/api/v1/search",
+                Deno.env.get("YATTEE_BASE_URL") ||
+                    "https://yattee.etonello.work",
+            );
             url.searchParams.set("q", query);
             url.searchParams.set("type", "video");
-            const response = await fetch(url, { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } });
-            if (!response.ok) throw new Error(`Yattee search failed (${response.status})`);
-            const results = await response.json() as { videoId?: string }[];
-            return c.json({ ok: true, videos: results.filter((video) => video.videoId).slice(0, 10) });
+            const response = await fetch(url, {
+                headers: {
+                    Authorization: `Basic ${btoa(`${username}:${password}`)}`,
+                },
+            });
+            if (!response.ok)
+                throw new Error(`Yattee search failed (${response.status})`);
+            const results = (await response.json()) as { videoId?: string }[];
+            return c.json({
+                ok: true,
+                videos: results.filter((video) => video.videoId).slice(0, 10),
+            });
         } catch (e) {
             return generalError(c, e);
         }
@@ -547,7 +656,7 @@ export async function main() {
             const filePath = path.join(tabDir, id, filename);
 
             // Check if file exists
-            if (!await fs.exists(filePath)) {
+            if (!(await fs.exists(filePath))) {
                 throw new Error("Audio file not found");
             }
 
@@ -559,8 +668,8 @@ export async function main() {
             const encodedFilename = encodeURIComponent(filename);
             let mime = "application/octet-stream";
             let mimeList: Record<string, string> = {
-                "mp3": "audio/mpeg",
-                "ogg": "audio/ogg",
+                mp3: "audio/mpeg",
+                ogg: "audio/ogg",
             };
 
             const ext = filename.split(".").pop()?.toLowerCase();
@@ -665,7 +774,7 @@ export async function main() {
             const filePath = getTabFilePath(tab);
 
             // Check if file exists
-            if (!await fs.exists(filePath)) {
+            if (!(await fs.exists(filePath))) {
                 throw new Error("Tab file not found");
             }
 
@@ -674,7 +783,9 @@ export async function main() {
                 read: true,
             });
 
-            const encodedOriginalFilename = encodeURIComponent(tab.originalFilename);
+            const encodedOriginalFilename = encodeURIComponent(
+                tab.originalFilename,
+            );
 
             return c.body(file.readable, 200, {
                 "Content-Type": "application/octet-stream",
@@ -748,7 +859,11 @@ export async function main() {
                 throw new Error("Open folder is only supported on Windows");
             }
             const folder = getTabFolderPath(tab);
-            const child = new Deno.Command("explorer.exe", { args: [folder], stdout: "null", stderr: "null" }).spawn();
+            const child = new Deno.Command("explorer.exe", {
+                args: [folder],
+                stdout: "null",
+                stderr: "null",
+            }).spawn();
             await child.status;
             return c.json({ ok: true });
         } catch (e) {
@@ -767,7 +882,11 @@ export async function main() {
             }
 
             const fullPath = getTabFullFilePath(tab);
-            const child = new Deno.Command("cmd", { args: ["/c", "start", "", fullPath], stdout: "null", stderr: "null" }).spawn();
+            const child = new Deno.Command("cmd", {
+                args: ["/c", "start", "", fullPath],
+                stdout: "null",
+                stderr: "null",
+            }).spawn();
             await child.status;
             return c.json({ ok: true });
         } catch (e) {
@@ -790,10 +909,13 @@ export async function main() {
 
     // if /api/* not found, return 404
     app.all("/api/*", (c) => {
-        return c.json({
-            ok: false,
-            msg: "Page Not found",
-        }, 404);
+        return c.json(
+            {
+                ok: false,
+                msg: "Page Not found",
+            },
+            404,
+        );
     });
 
     // For SPA, always return index.html
@@ -835,26 +957,49 @@ function generalError(c: Context, e: unknown) {
         for (const issue of e.issues) {
             message += `${issue.path.join(".")}: ${issue.message}\n`;
         }
-        return c.json({
-            ok: false,
-            msg: message,
-        }, 400);
+        return c.json(
+            {
+                ok: false,
+                msg: message,
+            },
+            400,
+        );
     } else if (e instanceof Error) {
-        return c.json({
-            ok: false,
-            msg: e.message,
-        }, 400);
+        return c.json(
+            {
+                ok: false,
+                msg: e.message,
+            },
+            400,
+        );
     } else {
-        return c.json({
-            ok: false,
-            msg: "Unknown error",
-        }, 400);
+        return c.json(
+            {
+                ok: false,
+                msg: "Unknown error",
+            },
+            400,
+        );
     }
 }
 
 function ultimateGuitarError(c: Context, e: unknown) {
-    if (e instanceof UltimateGuitarError) return c.json({ ok: false, code: e.code, msg: e.message }, e.status as 400);
-    return c.json({ ok: false, code: "upstream_error", msg: e instanceof Error ? e.message : "Ultimate Guitar request failed" }, 502);
+    if (e instanceof UltimateGuitarError)
+        return c.json(
+            { ok: false, code: e.code, msg: e.message },
+            e.status as 400,
+        );
+    return c.json(
+        {
+            ok: false,
+            code: "upstream_error",
+            msg:
+                e instanceof Error
+                    ? e.message
+                    : "Ultimate Guitar request failed",
+        },
+        502,
+    );
 }
 
 if (import.meta.main) {

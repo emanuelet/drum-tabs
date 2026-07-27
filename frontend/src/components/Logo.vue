@@ -17,7 +17,7 @@ export default {
         }'
         to="/"
     >
-        <img src="/icon.png" alt="It's MyTabs" />
+        <img src="/icon.png" alt="Drum Tabs" />
     </router-link>
 </template>
 
