@@ -7,7 +7,7 @@ import { importer, Settings } from "@coderline/alphatab";
 const tempDir = await Deno.makeTempDir();
 Deno.env.set("DATA_DIR", tempDir);
 
-const { createExercise, getAllExercises, normalizeExerciseAlphaTex, parseExerciseAlphaTex, updateExerciseFav } = await import("./exercise.ts");
+const { createExercise, deleteExercise, getAllExercises, normalizeExerciseAlphaTex, parseExerciseAlphaTex, updateExercise, updateExerciseFav } = await import("./exercise.ts");
 
 const fillExercise = `\\title "Fill Value Permutation Exercise"
 \\subtitle "Shifting 16th Notes Through 8th Notes - Quarter Bar Fills"
@@ -52,6 +52,30 @@ Deno.test("numeric drum AlphaTex normalizes to a score AlphaTab can load", () =>
     assertEquals(score.title, "Fill Value Permutation Exercise");
     assertEquals(score.tempo, 100);
     assertEquals(score.tracks[0].staves[0].isPercussion, true);
+});
+
+Deno.test("normalization restores separators between compact duration groups", () => {
+    const alphaTex = '\\title "Compact"\\tempo 100\\track "Drums" \\instrument percussion\\n:8 (KickHit HiHatClosed):8 (SnareHit HiHatClosed)|';
+    assertEquals(normalizeExerciseAlphaTex(alphaTex).includes(") :8"), true);
+});
+
+Deno.test("updateExercise persists edited AlphaTex metadata", async () => {
+    const exercise = (await getAllExercises())[0];
+    const updated = await updateExercise(
+        exercise.id,
+        `\\title "Edited"
+\\tempo 120
+\\track "Drums" \\instrument percussion
+:4 KickHit`,
+    );
+    assertEquals(updated.title, "Edited");
+    assertEquals(updated.tempo, 120);
+});
+
+Deno.test("deleteExercise removes an exercise", async () => {
+    const exercise = (await getAllExercises())[0];
+    await deleteExercise(exercise.id);
+    assertEquals((await getAllExercises()).some((item) => item.id === exercise.id), false);
 });
 
 Deno.test("named AlphaTex is not changed during exercise import", () => {

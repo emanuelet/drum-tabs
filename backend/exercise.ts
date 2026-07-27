@@ -94,7 +94,7 @@ function normalizeDrumChord(source: string): string {
  * articulation-based form AlphaTab 1.8 can render.
  */
 export function normalizeExerciseAlphaTex(alphaTex: string): string {
-    return alphaTex.split("\n").flatMap((line) => {
+    return alphaTex.replace(/(\S):(\d+)/g, "$1 :$2").split("\n").flatMap((line) => {
         if (line.trim() === ".music") return [];
         if (/^\s*\\track\s+"[^"]+"\s+"drums"\s*$/.test(line)) {
             return [line.replace(/"drums"\s*$/, "\\instrument percussion \\clef neutral \\articulation defaults")];
@@ -158,4 +158,33 @@ export async function updateExerciseFav(id: string, fav: boolean): Promise<Exerc
     await write;
 
     return updatedExercise!;
+}
+
+export async function updateExercise(id: string, alphaTex: string): Promise<Exercise> {
+    const metadata = parseExerciseAlphaTex(alphaTex);
+    const normalizedAlphaTex = normalizeExerciseAlphaTex(alphaTex);
+    let updatedExercise: Exercise | undefined;
+    const write = writeQueue.then(async () => {
+        const exercises = await getAllExercises();
+        const exercise = exercises.find((item) => item.id === id);
+        if (!exercise) throw new Error("Exercise not found");
+        Object.assign(exercise, metadata, { alphaTex: normalizedAlphaTex });
+        updatedExercise = exercise;
+        await writeExercises(exercises);
+    });
+    writeQueue = write.catch(() => {});
+    await write;
+
+    return updatedExercise!;
+}
+
+export async function deleteExercise(id: string): Promise<void> {
+    const write = writeQueue.then(async () => {
+        const exercises = await getAllExercises();
+        const remainingExercises = exercises.filter((exercise) => exercise.id !== id);
+        if (remainingExercises.length === exercises.length) throw new Error("Exercise not found");
+        await writeExercises(remainingExercises);
+    });
+    writeQueue = write.catch(() => {});
+    await write;
 }

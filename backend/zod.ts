@@ -46,6 +46,9 @@ export const UpdateExerciseFavSchema = z.object({
 });
 export type UpdateExerciseFav = z.infer<typeof UpdateExerciseFavSchema>;
 
+export const UpdateExerciseSchema = CreateExerciseSchema;
+export type UpdateExercise = z.infer<typeof UpdateExerciseSchema>;
+
 const videoID = z.string().min(1);
 const syncMethod = z.enum(["simple", "advanced"]);
 const simpleSync = z.number();
