@@ -54,6 +54,7 @@ export default defineComponent({
             speed: 100,
             speedMarks: [25, 50, 75, 100, 125, 150, 175],
             tempo: 120,
+            tabScale: 1,
             showSpeedSelector: false,
             ready: false,
             selectedTrack: 0,
@@ -337,6 +338,7 @@ export default defineComponent({
         this.setting = getSetting();
         this.toolbarHidden = this.setting.toolbarAutoHide;
         this.tabID = this.$route.params.id;
+        this.tabScale = this.getConfig("scale", this.setting.scale);
         const urlParams = new URLSearchParams(window.location.search);
 
         try {
@@ -422,8 +424,25 @@ export default defineComponent({
             this.setBpm(this.bpm + amount);
         },
 
+        adjustTabScale(amount) {
+            this.setTabScale(this.tabScale + amount);
+        },
+
+        setTabScale(value) {
+            const scale = Math.round(Number(value) * 10) / 10;
+            if (!Number.isFinite(scale)) return;
+            this.tabScale = Math.max(0.5, Math.min(3, scale));
+            if (this.api) {
+                this.api.settings.display.scale = this.tabScale;
+                this.api.updateSettings();
+                const track = this.api.score?.tracks[this.selectedTrack];
+                if (track) this.api.renderTracks([track]);
+            }
+            this.setConfig("scale", this.tabScale);
+        },
+
         setBpm(value) {
-            const bpm = Number(value);
+            const bpm = Math.round(Number(value) * 100) / 100;
             if (!Number.isFinite(bpm) || this.tempo <= 0) return;
             const nextBpm = Math.max(this.tempo * 0.2, Math.min(this.tempo * 2, bpm));
             this.speed = nextBpm / this.tempo * 100;
@@ -667,7 +686,7 @@ export default defineComponent({
                         staveProfile: getStaveProfile(this.setting.scoreStyle, StaveProfile),
                         resources: displayResources,
                         layoutMode,
-                        scale: this.setting.scale,
+                        scale: this.tabScale,
                     },
                 });
 
@@ -1590,7 +1609,7 @@ export default defineComponent({
                     <div class="speed-selector-header">
                         <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
                         <label class="visually-hidden" for="bpm-input">BPM</label>
-                        <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.1" inputmode="decimal" aria-label="BPM" @change="setBpm($event.target.value)" />
+                        <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM" @change="setBpm($event.target.value)" />
                         <span>BPM</span>
                         <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
                     </div>
@@ -1603,6 +1622,16 @@ export default defineComponent({
                         <span class="speed-unit">%</span>
                     </div>
                     </div>
+                </div>
+
+                <div class="zoom-selector">
+                    <button class="btn btn-secondary" type="button" aria-label="Zoom out" :disabled="tabScale <= 0.5" @click="adjustTabScale(-0.1)">
+                        −
+                    </button>
+                    <span>Zoom {{ Math.round(tabScale * 100) }}%</span>
+                    <button class="btn btn-secondary" type="button" aria-label="Zoom in" :disabled="tabScale >= 3" @click="adjustTabScale(0.1)">
+                        +
+                    </button>
                 </div>
 
                 <div class="btn-edit" v-if="isLoggedIn">
@@ -2043,6 +2072,17 @@ $padding: 20px;
 
     > .btn {
         width: 160px;
+    }
+}
+
+.zoom-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    span {
+        min-width: 76px;
+        text-align: center;
     }
 }
 
