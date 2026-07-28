@@ -117,7 +117,7 @@ export default defineComponent({
         },
 
         bpm() {
-            return Math.round(this.tempo * this.speed / 100);
+            return Math.round(this.tempo * this.speed) / 100;
         },
 
         audioSelectionLabel() {
@@ -285,7 +285,7 @@ export default defineComponent({
 
             // Rate limit the speed change action
             speedActionBuffer.run(() => {
-                this.api.playbackSpeed = parseFloat((speed / 100).toFixed(2));
+                this.api.playbackSpeed = speed / 100;
                 this.setConfig("speed", speed);
             });
         },
@@ -419,8 +419,14 @@ export default defineComponent({
     },
     methods: {
         adjustBpm(amount) {
-            const nextBpm = Math.max(Math.ceil(this.tempo * 0.2), Math.min(Math.floor(this.tempo * 2), this.bpm + amount));
-            this.speed = Math.round(nextBpm / this.tempo * 100);
+            this.setBpm(this.bpm + amount);
+        },
+
+        setBpm(value) {
+            const bpm = Number(value);
+            if (!Number.isFinite(bpm) || this.tempo <= 0) return;
+            const nextBpm = Math.max(this.tempo * 0.2, Math.min(this.tempo * 2, bpm));
+            this.speed = nextBpm / this.tempo * 100;
         },
 
         speedMarkPosition(mark) {
@@ -1583,7 +1589,9 @@ export default defineComponent({
                     <div class="speed-selector-popover" v-if="showSpeedSelector">
                     <div class="speed-selector-header">
                         <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
-                        <strong>{{ bpm }} BPM</strong>
+                        <label class="visually-hidden" for="bpm-input">BPM</label>
+                        <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.1" inputmode="decimal" aria-label="BPM" @change="setBpm($event.target.value)" />
+                        <span>BPM</span>
                         <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
                     </div>
                     <div class="speed-scale">
@@ -2060,8 +2068,8 @@ $padding: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
-    width: 132px;
+    gap: 8px;
+    width: fit-content;
     padding-bottom: 10px;
     border-bottom: 1px solid currentColor;
 
@@ -2078,9 +2086,13 @@ $padding: 20px;
         }
     }
 
-    strong {
-        min-width: 56px;
+    input {
+        width: 64px;
+        padding: 0;
+        color: inherit;
         text-align: center;
+        background: transparent;
+        border: 0;
         font-size: 16px;
     }
 }

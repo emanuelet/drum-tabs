@@ -163,6 +163,27 @@ export default defineComponent({
                 this.saving = false;
             }
         },
+        async importGuitarPro(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            try {
+                const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(
+                    new Uint8Array(await file.arrayBuffer()),
+                    new alphaTab.Settings(),
+                );
+                const alphaTex = new alphaTab.exporter.AlphaTexExporter().exportToString(score);
+                const parser = new alphaTab.importer.alphaTex.AlphaTexParser(alphaTex);
+                parser.read();
+                this.alphaTex = alphaTex;
+                this.analyzeAlphaTex();
+                notify({ text: `Imported ${score.title || file.name}`, type: "success" });
+            } catch (error) {
+                notify({ text: error.message || "Unable to import Guitar Pro file", type: "error" });
+            } finally {
+                event.target.value = "";
+            }
+        },
         openAddDialog() {
             this.editingExercise = null;
             this.alphaTex = "";
@@ -303,7 +324,8 @@ export default defineComponent({
         <dialog ref="addDialog" class="add-dialog">
             <form @submit.prevent="saveExercise">
                 <div class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
-                <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>. The subtitle is optional.</p>
+                <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>, or import a Guitar Pro file. The subtitle is optional.</p>
+                <label class="btn btn-outline-secondary import-guitar-pro">Import Guitar Pro<input type="file" accept=".gp,.gpx,.gp3,.gp4,.gp5" @change="importGuitarPro" /></label>
                 <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
                 <div v-if="alphaTexAnalysis" class="alphatex-analysis" :class="alphaTexAnalysis.valid ? 'valid' : 'invalid'">
                     <strong>{{ alphaTexAnalysis.valid ? "Syntax valid" : "Syntax invalid" }}</strong>
@@ -485,6 +507,13 @@ header {
     margin-top: 12px;
     padding: 10px 12px;
     border-radius: 4px;
+}
+.import-guitar-pro {
+    display: inline-flex;
+    margin-bottom: 12px;
+}
+.import-guitar-pro input {
+    display: none;
 }
 .alphatex-analysis.valid {
     color: #9dd37c;
