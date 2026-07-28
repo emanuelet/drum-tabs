@@ -50,7 +50,7 @@ Tip: Youtube videos may not work on a private ip address (e.g. 192.168.x.x), use
 
 ### Windows (exe)
 
-Download the latest release (drumtubs-v1.x.x-windows.zip) from the [Releases](https://github.com/emanuelet/drum-tabs/releases/latest) page, unzip it, and run `drumtubs.exe`.
+Download the latest release (drumtabs-v1.x.x-windows.zip) from the [Releases](https://github.com/emanuelet/drum-tabs/releases/latest) page, unzip it, and run `drumtabs.exe`.
 
 ### Docker Compose
 
@@ -59,7 +59,7 @@ Download the [compose.yaml]() file and put it in an empty folder.
 ```yaml
 services:
     app:
-        image: emanuelet/drumtubs:1
+        image: emanuelet/drumtabs:1
         ports:
             # Host Port:Container Port
             - "47777:47777"
@@ -106,7 +106,7 @@ Configure a local MCP client to start it from this repository:
 ### Docker
 
 ```bash
-docker run -d --name drumtubs -p 47777:47777 -v drumtubs:/app/data --restart unless-stopped emanuelet/drumtubs:1
+docker run -d --name drumtabs -p 47777:47777 -v drumtabs:/app/data --restart unless-stopped emanuelet/drumtabs:1
 ```
 
 Go to `http://localhost:47777` to access the web UI.

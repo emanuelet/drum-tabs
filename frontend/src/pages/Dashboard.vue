@@ -2,7 +2,6 @@
 import { defineComponent } from "vue";
 import { BButton, BButtonGroup, BFormInput, BSpinner } from "bootstrap-vue-next";
 import { authClient, isLoggedIn } from "../auth-client.ts";
-import { notify } from "@kyvg/vue3-notification";
 import Logo from "../components/Logo.vue";
 
 export default defineComponent({
@@ -42,11 +41,9 @@ export default defineComponent({
 </script>
 
 <template>
-    <div
-        :class='{
-            "fixed-navbar": fixedNavbar,
-        }'
-    >
+    <div :class='{
+        "fixed-navbar": fixedNavbar,
+    }'>
         <div class="my-navbar">
             <Logo />
 
@@ -71,6 +68,11 @@ export default defineComponent({
                         <font-awesome-icon :icon='["fas", "gear"]' />
                         Settings
                     </router-link>
+
+                    <a href="https://drum-metronome.pages.dev/" target="_blank" rel="noopener noreferrer">
+                        <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
+                        Drum Metronome
+                    </a>
                 </div>
 
                 <div class="right" v-show="ready">
@@ -129,7 +131,7 @@ $navHeight: 100px;
         display: flex;
         justify-content: space-between;
 
-        & > div {
+        &>div {
             flex-grow: 4;
             display: flex;
             column-gap: 50px;
@@ -142,7 +144,7 @@ $navHeight: 100px;
                 justify-content: flex-end;
             }
 
-            & > a {
+            &>a {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -177,7 +179,7 @@ $navHeight: 100px;
         .toolbar {
             padding: 0 0 0 10px;
 
-            & > div {
+            &>div {
                 column-gap: 10px;
             }
         }

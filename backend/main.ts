@@ -10,11 +10,15 @@ import {
 } from "./auth.ts";
 import {
     SignUpSchema,
+    CreateExerciseSchema,
+    UpdateExerciseFavSchema,
+    UpdateExerciseSchema,
     SyncRequestSchema,
     UpdateTabFavSchema,
     UpdateTabInfoSchema,
     YoutubeAddDataSchema,
 } from "./zod.ts";
+import { createExercise, deleteExercise, getAllExercises, updateExercise, updateExerciseFav } from "./exercise.ts";
 import { db, hasUser, isInitDB, kv, migrate } from "./db.ts";
 import { cors } from "@hono/hono/cors";
 import { serveStatic } from "@hono/hono/deno";
@@ -288,6 +292,56 @@ export async function main() {
             return generalError(c, e);
         }
     });
+
+    app.get("/api/exercises", async (c) => {
+        try {
+            await checkLogin(c);
+            return c.json({ ok: true, exercises: await getAllExercises() });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/exercises", async (c) => {
+        try {
+            await checkLogin(c);
+            const { alphaTex } = CreateExerciseSchema.parse(await c.req.json());
+            return c.json({ ok: true, exercise: await createExercise(alphaTex) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/exercises/:id/fav", async (c) => {
+        try {
+            await checkLogin(c);
+            const { fav } = UpdateExerciseFavSchema.parse(await c.req.json());
+            return c.json({ ok: true, exercise: await updateExerciseFav(c.req.param("id"), fav) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/exercises/:id", async (c) => {
+        try {
+            await checkLogin(c);
+            const { alphaTex } = UpdateExerciseSchema.parse(await c.req.json());
+            return c.json({ ok: true, exercise: await updateExercise(c.req.param("id"), alphaTex) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.delete("/api/exercises/:id", async (c) => {
+        try {
+            await checkLogin(c);
+            await deleteExercise(c.req.param("id"));
+            return c.json({ ok: true });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
     // Ultimate Guitar search proxy. The cookie is supplied by the client and is never stored.
     app.get("/api/ultimate-guitar/search", async (c) => {
         try {

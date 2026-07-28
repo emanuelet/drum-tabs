@@ -1,13 +1,78 @@
 <script>
 import { defineComponent } from "vue";
-import { getSetting } from "../app.js";
-import { exercises } from "../exercises.js";
+import { baseURL, getSetting } from "../app.js";
+import { notify } from "@kyvg/vue3-notification";
 
 const alphaTab = await import("@coderline/alphatab");
 
+function splitExerciseTracks(alphaTex, title) {
+    const lines = alphaTex.split("\n");
+    const marker = /^\s*%\s*---\s*(.*?)\s*---\s*$/;
+    const lineComment = /^\s*\/\/\s*(.*?)\s*$/;
+    const header = [];
+    const tracks = [];
+    let current;
+
+    for (const line of lines) {
+        const match = line.match(marker);
+        if (match) {
+            current = { title: match[1], lines: [] };
+            tracks.push(current);
+        } else if (lineComment.test(line)) {
+            const comment = line.match(lineComment)[1];
+            const startsTrack = /^(Pattern|Variation|Exercise)\s+\d+:/i.test(comment);
+            if (startsTrack) {
+                current = { title: comment, lines: [] };
+                tracks.push(current);
+            } else if (current) {
+                current.lines.push(line);
+            } else {
+                header.push(line);
+            }
+        } else if (current) {
+            current.lines.push(line);
+        } else {
+            header.push(line);
+        }
+    }
+
+    if (tracks.length === 0) return [{ title, alphaTex }];
+    return tracks.map((track) => ({ title: track.title, alphaTex: [...header, ...track.lines].join("\n") }));
+}
+
 export default defineComponent({
     data() {
-        return { exercises, selected: exercises[0], api: null, playing: false, tempo: exercises[0].tempo, metronome: false, looping: true, setting: getSetting() };
+        return {
+            exercises: [],
+            selected: null,
+            api: null,
+            playing: false,
+            tempo: 120,
+            metronome: false,
+            looping: true,
+            setting: getSetting(),
+            searchQuery: "",
+            alphaTex: "",
+            editingExercise: null,
+            alphaTexAnalysis: null,
+            selectedTrackIndex: 0,
+            saving: false,
+            ready: false,
+        };
+    },
+    computed: {
+        favoriteExercises() {
+            return this.exercises.filter((exercise) => exercise.fav);
+        },
+        exerciseTracks() {
+            if (!this.selected) return [];
+            return splitExerciseTracks(this.selected.alphaTex, this.selected.title);
+        },
+        filteredExercises() {
+            const query = this.searchQuery.trim().toLowerCase();
+            if (!query) return this.exercises;
+            return this.exercises.filter((exercise) => [exercise.title, exercise.subtitle, exercise.alphaTex].some((value) => value.toLowerCase().includes(query)));
+        },
     },
     async mounted() {
         let resources = { tablatureFont: "bold 14px Arial", barNumberColor: "#6D6D6D" };
@@ -21,31 +86,181 @@ export default defineComponent({
             display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
         });
         this.api.playerStateChanged.on((event) => this.playing = event.state === alphaTab.synth.PlayerState.Playing);
-        this.loadExercise();
+        try {
+            const res = await fetch(baseURL + "/api/exercises", { credentials: "include" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.msg || "Failed to load exercises");
+            this.exercises = data.exercises;
+            this.selected = this.exercises[0] || null;
+            this.loadExercise();
+            this.ready = true;
+        } catch (error) {
+            notify({ text: error.message || "Failed to load exercises", type: "error" });
+        }
     },
     beforeUnmount() {
         this.api?.destroy();
     },
     methods: {
         loadExercise() {
-            this.playing = false;
+            if (!this.selected || !this.api) return;
             this.tempo = this.selected.tempo;
-            this.api.tex(this.selected.alphaTex);
+            this.loadSelectedTrack();
+        },
+        loadSelectedTrack() {
+            if (!this.selected || !this.api) return;
+            this.playing = false;
+            const isSectionedExercise = this.exerciseTracks.length > 1;
+            this.api.settings.display.barsPerRow = isSectionedExercise ? 2 : -1;
+            this.api.settings.display.stretchForce = isSectionedExercise ? 1.35 : 1;
+            this.api.updateSettings();
+            this.api.tex(this.exerciseTracks[this.selectedTrackIndex].alphaTex);
+        },
+        selectExercise(exercise) {
+            this.selected = exercise;
+            this.selectedTrackIndex = 0;
+            this.loadExercise();
         },
         playPause() {
+            if (!this.api || !this.selected) return;
             if (this.playing) this.api.pause();
             else this.api.play();
         },
         updatePlayback() {
+            if (!this.api || !this.selected) return;
             this.api.playbackSpeed = this.tempo / this.selected.tempo;
             this.api.metronomeVolume = this.metronome ? 1 : 0;
             this.api.isLooping = this.looping;
+        },
+        async saveExercise() {
+            if (!this.alphaTex.trim()) {
+                notify({ text: "Paste AlphaTex before saving", type: "error" });
+                return;
+            }
+            this.saving = true;
+            try {
+                const url = this.editingExercise ? `/api/exercises/${this.editingExercise.id}` : "/api/exercises";
+                const res = await fetch(baseURL + url, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ alphaTex: this.alphaTex }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Failed to save exercise");
+                this.exercises = this.editingExercise
+                    ? this.exercises.map((exercise) => exercise.id === data.exercise.id ? data.exercise : exercise)
+                    : [...this.exercises, data.exercise];
+                this.alphaTex = "";
+                this.editingExercise = null;
+                this.alphaTexAnalysis = null;
+                this.selectExercise(data.exercise);
+                this.closeAddDialog();
+                notify({ text: "Exercise saved", type: "success" });
+            } catch (error) {
+                notify({ text: error.message || "Failed to save exercise", type: "error" });
+            } finally {
+                this.saving = false;
+            }
+        },
+        async importGuitarPro(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            try {
+                const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(
+                    new Uint8Array(await file.arrayBuffer()),
+                    new alphaTab.Settings(),
+                );
+                const alphaTex = new alphaTab.exporter.AlphaTexExporter().exportToString(score);
+                const parser = new alphaTab.importer.alphaTex.AlphaTexParser(alphaTex);
+                parser.read();
+                this.alphaTex = alphaTex;
+                this.analyzeAlphaTex();
+                notify({ text: `Imported ${score.title || file.name}`, type: "success" });
+            } catch (error) {
+                notify({ text: error.message || "Unable to import Guitar Pro file", type: "error" });
+            } finally {
+                event.target.value = "";
+            }
+        },
+        openAddDialog() {
+            this.editingExercise = null;
+            this.alphaTex = "";
+            this.alphaTexAnalysis = null;
+            this.$refs.addDialog.showModal();
+        },
+        openEditDialog(exercise) {
+            this.editingExercise = exercise;
+            this.alphaTex = exercise.alphaTex;
+            this.$refs.addDialog.showModal();
+            this.analyzeAlphaTex();
+        },
+        closeAddDialog() {
+            this.$refs.addDialog.close();
+        },
+        analyzeAlphaTex() {
+            if (!this.alphaTex.trim()) {
+                this.alphaTexAnalysis = null;
+                return;
+            }
+            try {
+                const parser = new alphaTab.importer.alphaTex.AlphaTexParser(this.alphaTex);
+                parser.read();
+                const diagnostics = [
+                    ...(parser.lexerDiagnostics?.items || parser.lexerDiagnostics || []),
+                    ...(parser.parserDiagnostics?.items || parser.parserDiagnostics || []),
+                ];
+                const errorSeverity = alphaTab.importer.alphaTex.AlphaTexDiagnosticsSeverity.Error;
+                const errors = diagnostics.filter((diagnostic) => diagnostic.severity === errorSeverity);
+                this.alphaTexAnalysis = {
+                    valid: errors.length === 0,
+                    diagnostics: errors.map((diagnostic) => diagnostic.message),
+                    title: this.alphaTex.match(/^\\title\s+"([^"\r\n]+)"/m)?.[1] || "Untitled",
+                    subtitle: this.alphaTex.match(/^\\subtitle\s+"([^"\r\n]+)"/m)?.[1] || "",
+                    tempo: this.alphaTex.match(/^\\tempo\s+(\d+)/m)?.[1] || "Not set",
+                };
+            } catch (error) {
+                this.alphaTexAnalysis = { valid: false, diagnostics: [error.message || "Unable to parse AlphaTex"] };
+            }
+        },
+        async toggleFav(exercise) {
+            try {
+                const res = await fetch(baseURL + `/api/exercises/${exercise.id}/fav`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ fav: !exercise.fav }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Failed to update favorite");
+                this.exercises = this.exercises.map((item) => item.id === exercise.id ? data.exercise : item);
+            } catch (error) {
+                notify({ text: error.message || "Failed to update favorite", type: "error" });
+            }
+        },
+        async deleteExercise(exercise) {
+            if (!confirm(`Delete "${exercise.title}"?`)) return;
+            try {
+                const res = await fetch(baseURL + `/api/exercises/${exercise.id}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || "Failed to delete exercise");
+                this.exercises = this.exercises.filter((item) => item.id !== exercise.id);
+                if (this.selected?.id === exercise.id) this.selectExercise(this.exercises[0] || null);
+                notify({ text: "Exercise deleted", type: "success" });
+            } catch (error) {
+                notify({ text: error.message || "Failed to delete exercise", type: "error" });
+            }
         },
     },
     watch: {
         tempo: "updatePlayback",
         metronome: "updatePlayback",
         looping: "updatePlayback",
+        selectedTrackIndex: "loadSelectedTrack",
     },
 });
 </script>
@@ -55,23 +270,71 @@ export default defineComponent({
         <header>
             <p class="eyebrow">Practice library</p>
             <h1>Drum exercises</h1>
-            <p>Built-in patterns, ready to practice without adding files to your library.</p>
+            <p>Practice patterns stored separately from your tab library.</p>
         </header>
-        <div class="exercise-grid">
-            <button v-for="exercise in exercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }" @click="selected = exercise; loadExercise()">
-                <strong>{{ exercise.title }}</strong><span>{{ exercise.description }}</span><small>{{ exercise.tempo }} BPM</small>
-            </button>
-        </div>
         <section class="player" :class="{ light: setting.scoreColor === 'light' }">
             <div class="controls">
-                <button class="btn btn-primary" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
-                <label>Tempo <input v-model.number="tempo" type="number" min="30" max="240" /> BPM</label>
+                <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
+                <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
                 <label><input v-model="metronome" type="checkbox" /> Metronome</label>
                 <label><input v-model="looping" type="checkbox" /> Loop</label>
+                <label v-if="exerciseTracks.length > 1" class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
             </div>
-            <h2 class="score-title">{{ selected.title }}</h2>
+            <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
             <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
         </section>
+        <section v-if="ready" class="favorites">
+            <div class="preset-heading">
+                <h2>Favorites</h2>
+            </div>
+            <div class="exercise-grid">
+                <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
+                    <button class="exercise-select" @click="selectExercise(exercise)">
+                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" type="button" @click="toggleFav(exercise)">Unfavorite</button>
+                </article>
+            </div>
+            <p v-if="favoriteExercises.length === 0" class="text-muted mt-3">Favorite exercises to keep them here.</p>
+        </section>
+        <section v-if="ready" class="all-exercises">
+            <div class="preset-heading">
+                <h2>All exercises</h2>
+                <div class="exercise-actions">
+                    <div class="input-group search">
+                        <span class="input-group-text"><font-awesome-icon icon="magnifying-glass" /></span>
+                        <input v-model="searchQuery" class="form-control" type="search" placeholder="Search exercises" aria-label="Search exercises" />
+                        <button v-if="searchQuery" class="btn btn-outline-secondary" type="button" @click="searchQuery = ''">Clear</button>
+                    </div>
+                    <button class="btn btn-primary" type="button" @click="openAddDialog">Add exercise</button>
+                </div>
+            </div>
+            <div class="exercise-list">
+                <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected.id === exercise.id }">
+                    <button class="exercise-select" @click="selectExercise(exercise)">
+                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small>
+                    </button>
+                    <button class="btn btn-sm" :class="exercise.fav ? 'btn-outline-warning' : 'btn-outline-secondary'" type="button" @click="toggleFav(exercise)">{{ exercise.fav ? "Unfavorite" : "Favorite" }}</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @click="openEditDialog(exercise)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" @click="deleteExercise(exercise)">Delete</button>
+                </article>
+            </div>
+            <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
+        </section>
+        <dialog ref="addDialog" class="add-dialog">
+            <form @submit.prevent="saveExercise">
+                <div class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
+                <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>, or import a Guitar Pro file. The subtitle is optional.</p>
+                <label class="btn btn-outline-secondary import-guitar-pro">Import Guitar Pro<input type="file" accept=".gp,.gpx,.gp3,.gp4,.gp5" @change="importGuitarPro" /></label>
+                <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
+                <div v-if="alphaTexAnalysis" class="alphatex-analysis" :class="alphaTexAnalysis.valid ? 'valid' : 'invalid'">
+                    <strong>{{ alphaTexAnalysis.valid ? "Syntax valid" : "Syntax invalid" }}</strong>
+                    <span v-if="alphaTexAnalysis.valid">{{ alphaTexAnalysis.title }}<template v-if="alphaTexAnalysis.subtitle"> - {{ alphaTexAnalysis.subtitle }}</template> · {{ alphaTexAnalysis.tempo }} BPM</span>
+                    <ul v-else><li v-for="diagnostic in alphaTexAnalysis.diagnostics" :key="diagnostic">{{ diagnostic }}</li></ul>
+                </div>
+                <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
+            </form>
+        </dialog>
     </main>
 </template>
 
@@ -88,6 +351,30 @@ header {
     letter-spacing: .08em;
     text-transform: uppercase;
 }
+.favorites,
+.all-exercises {
+    margin-top: 24px;
+}
+.preset-heading {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.preset-heading h2,
+.import-exercise h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+.search {
+    max-width: 360px;
+}
+.exercise-actions {
+    display: flex;
+    gap: 8px;
+}
 .exercise-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -100,6 +387,45 @@ header {
     background: transparent;
     color: inherit;
     border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+.exercise-select {
+    border: 0;
+    padding: 0;
+    width: 100%;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+}
+.exercise-list {
+    border: 1px solid #555;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.exercise-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #555;
+}
+.exercise-row:last-child {
+    border-bottom: 0;
+}
+.exercise-row.active {
+    box-shadow: inset 3px 0 0 #d87d30;
+}
+.exercise-row .exercise-select {
+    flex: 1;
+}
+.exercise-row span,
+.exercise-row small {
+    display: inline;
+    margin-left: 8px;
+    opacity: .7;
 }
 .exercise-card.active {
     border-color: #d87d30;
@@ -114,7 +440,6 @@ header {
     opacity: .7;
 }
 .player {
-    margin-top: 24px;
     border: 1px solid #555;
     border-radius: 8px;
     overflow: hidden;
@@ -129,6 +454,22 @@ header {
 }
 .controls input[type="number"] {
     width: 70px;
+}
+.tempo-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.tempo-control input[type="range"] {
+    width: min(220px, 42vw);
+}
+.tempo-control output {
+    min-width: 58px;
+}
+.track-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .score {
     min-height: 260px;
@@ -146,6 +487,69 @@ header {
 
     .player.light & {
         color: #333;
+    }
+}
+.add-dialog {
+    width: min(720px, calc(100vw - 32px));
+    color: inherit;
+    background: var(--bs-body-bg);
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 20px;
+}
+.add-dialog::backdrop {
+    background: rgba(0, 0, 0, .65);
+}
+.alphatex-analysis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+}
+.import-guitar-pro {
+    display: inline-flex;
+    margin-bottom: 12px;
+}
+.import-guitar-pro input {
+    display: none;
+}
+.alphatex-analysis.valid {
+    color: #9dd37c;
+    background: rgba(58, 120, 44, .2);
+}
+.alphatex-analysis.invalid {
+    color: #f1a1a1;
+    background: rgba(130, 45, 45, .2);
+}
+.alphatex-analysis ul {
+    width: 100%;
+    margin: 0;
+    padding-left: 20px;
+}
+.dialog-heading,
+.dialog-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.dialog-heading h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+.dialog-actions {
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+@media (max-width: 575px) {
+    .search {
+        max-width: none;
+        flex: 1;
+    }
+    .exercise-actions {
+        width: 100%;
     }
 }
 </style>

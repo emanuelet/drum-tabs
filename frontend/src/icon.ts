@@ -20,6 +20,7 @@ import {
     faPlus,
     faStar,
     faXmark,
+    faArrowUpRightFromSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 
@@ -38,6 +39,7 @@ library.add([
     faStar,
     faStarRegular,
     faArrowLeft,
+    faArrowUpRightFromSquare,
 ]);
 
 export { FontAwesomeIcon };

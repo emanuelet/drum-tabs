@@ -36,6 +36,19 @@ export const UpdateTabFavSchema = z.object({
 });
 export type UpdateTabFav = z.infer<typeof UpdateTabFavSchema>;
 
+export const CreateExerciseSchema = z.object({
+    alphaTex: z.string().trim().min(1),
+});
+export type CreateExercise = z.infer<typeof CreateExerciseSchema>;
+
+export const UpdateExerciseFavSchema = z.object({
+    fav: z.boolean(),
+});
+export type UpdateExerciseFav = z.infer<typeof UpdateExerciseFavSchema>;
+
+export const UpdateExerciseSchema = CreateExerciseSchema;
+export type UpdateExercise = z.infer<typeof UpdateExerciseSchema>;
+
 const videoID = z.string().min(1);
 const syncMethod = z.enum(["simple", "advanced"]);
 const simpleSync = z.number();

@@ -1,12 +1,7 @@
 {
     "lock": false,
-    "unstable": [
-        "fmt-component"
-    ],
-    "exclude": [
-        "public/font",
-        "public/soundfont"
-    ],
+    "unstable": ["fmt-component"],
+    "exclude": ["public/font", "public/soundfont"],
     "fmt": {
         "indentWidth": 4,
         "semiColons": true,
