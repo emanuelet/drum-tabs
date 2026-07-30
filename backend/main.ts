@@ -1,7 +1,7 @@
 import { serve, ServerType } from "@hono/node-server";
 import { Context, Hono } from "@hono/hono";
 import * as fs from "@std/fs";
-import { auth, checkLogin, getCurrentSession, getCurrentUser, isFinishSetup, isLoggedIn, requireTeacher } from "./auth.ts";
+import { auth, checkLogin, getCurrentSession, getCurrentUser, isDisableSignUp, isFinishSetup, isLoggedIn, requireTeacher } from "./auth.ts";
 import {
     CreateAssignmentSchema,
     CreateExerciseSchema,
@@ -182,6 +182,7 @@ export async function main() {
 
     app.post("/api/register", async (c) => {
         try {
+            if (isDisableSignUp()) return c.json({ error: "Sign up is disabled" }, 403);
             const body = RegisterSchema.parse(await c.req.json());
 
             const data = await auth.api.signUpEmail({

@@ -297,6 +297,18 @@ Deno.test({
             body: JSON.stringify({ learnerId: learner.id, resourceType: "exercise", resourceId: exerciseId }),
         });
         assertEquals(forbiddenAssignment.status, 400);
+
+        Deno.env.set("MYTABS_DISABLE_SIGN_UP", "true");
+        try {
+            const blockedRegistration = await fetch(`${baseURL}/api/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: "blocked@example.com", name: "Blocked", role: "learner", pin: "123456" }),
+            });
+            assertEquals(blockedRegistration.status, 403);
+        } finally {
+            Deno.env.delete("MYTABS_DISABLE_SIGN_UP");
+        }
     },
 });
 

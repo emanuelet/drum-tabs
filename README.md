@@ -153,6 +153,9 @@ MYTABS_PORT=47777
 
 # (boolean) Whether to launch the browser when starting the app (Desktop only) (Default: true)
 MYTABS_LAUNCH_BROWSER=true
+
+# (boolean) Disable new teacher and learner registrations after startup (Default: false)
+MYTABS_DISABLE_SIGN_UP=false
 ```
 
 ## Keyboard Shortcuts

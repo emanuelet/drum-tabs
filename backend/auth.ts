@@ -19,7 +19,7 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         minPasswordLength: 6,
-        disableSignUp: false,
+        disableSignUp: isDisableSignUp(),
     },
 });
 
@@ -57,11 +57,11 @@ export function isFinishSetup() {
 }
 
 export function isDisableSignUp() {
-    return false;
+    return Deno.env.get("MYTABS_DISABLE_SIGN_UP") === "true";
 }
 
 export function disableSignUp() {
-    auth.options.emailAndPassword.disableSignUp = false;
+    auth.options.emailAndPassword.disableSignUp = true;
 }
 
 export async function checkLogin(c: Context) {
