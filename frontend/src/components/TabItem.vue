@@ -2,8 +2,10 @@
 import { defineComponent } from "vue";
 import { notify } from "@kyvg/vue3-notification";
 import { baseURL } from "../app.js";
+import AssignButton from "./AssignButton.vue";
 
 export default defineComponent({
+    components: { AssignButton },
     props: {
         tab: {
             type: Object,
@@ -12,6 +14,14 @@ export default defineComponent({
         showArtist: {
             type: Boolean,
             default: true,
+        },
+        canAssign: {
+            type: Boolean,
+            default: false,
+        },
+        canShowTeacherAssignment: {
+            type: Boolean,
+            default: false,
         },
     },
 
@@ -74,8 +84,10 @@ export default defineComponent({
         <router-link class="info" :to="`/tab/${tab.id}`">
             <div class="title">{{ tab.title }}</div>
             <div class="artist" v-if="showArtist">{{ tab.artist }}</div>
+            <small v-if="canShowTeacherAssignment && tab.teacherAssignment" class="teacher-badge">From {{ tab.teacherAssignment.teacherName }}</small>
         </router-link>
 
+        <AssignButton v-if="canAssign" resource-type="tab" :resource-id="tab.id" :resource-title="tab.title" />
         <button class="btn btn-secondary me-2" @click="handleEdit">
             Edit
         </button>
@@ -87,7 +99,7 @@ export default defineComponent({
 </template>
 
 <style scoped lang="scss">
-@import "../styles/vars.scss";
+@use "../styles/vars.scss" as *;
 
 .tab-item {
     display: flex;
@@ -129,6 +141,11 @@ export default defineComponent({
 
         .artist {
             color: $color2-dark;
+        }
+
+        .teacher-badge {
+            color: #d87d30;
+            font-weight: 700;
         }
     }
 

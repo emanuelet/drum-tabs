@@ -1,6 +1,5 @@
 <script>
 import { defineComponent } from "vue";
-import { authClient } from "../auth-client.ts";
 import { notify } from "@kyvg/vue3-notification";
 import { baseURL } from "../app.js";
 import Logo from "../components/Logo.vue";
@@ -11,44 +10,39 @@ export default defineComponent({
         return {
             processing: false,
             email: "",
-            password: "",
-            repeatPassword: "",
+            name: "",
+            pin: "",
+            repeatPin: "",
+            role: "learner",
         };
-    },
-    async mounted() {
-        const res = await fetch(baseURL + "/api/is-finish-setup");
-        const isFinishSetup = await res.json();
-        if (isFinishSetup) {
-            this.$router.push("/");
-        }
     },
     methods: {
         async submit() {
-            if (this.password !== this.repeatPassword) {
+            if (this.pin !== this.repeatPin) {
                 notify({
-                    title: "Passwords do not match",
+                    title: "PINs do not match",
                     type: "error",
                 });
                 return;
             }
 
             this.processing = true;
-            const { data, error } = await authClient.signUp.email({
-                email: this.email,
-                name: "Admin",
-                password: this.password,
-            });
-
-            if (error) {
-                notify({
-                    title: error.message,
-                    type: "error",
+            try {
+                const res = await fetch(baseURL + "/api/register", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: this.email, name: this.name, pin: this.pin, role: this.role }),
                 });
-            } else {
-                this.$router.push("/");
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.msg || "Registration failed");
+                notify({ title: "Account created. Log in with your PIN.", type: "success" });
+                this.$router.push("/login");
+            } catch (error) {
+                notify({ title: error.message || "Registration failed", type: "error" });
+            } finally {
+                this.processing = false;
             }
-
-            this.processing = false;
         },
     },
 });
@@ -63,8 +57,13 @@ export default defineComponent({
                 </div>
 
                 <p class="mt-3">
-                    {{ $t("Create your admin account") }}
+                    Create your account
                 </p>
+
+                <div class="form-floating mt-3">
+                    <input id="name" v-model="name" type="text" class="form-control" placeholder="Name" required>
+                    <label for="name">Name</label>
+                </div>
 
                 <div class="form-floating mt-3">
                     <input id="floatingInput" v-model="email" type="email" class="form-control" :placeholder='$t("Username")' required>
@@ -72,18 +71,21 @@ export default defineComponent({
                 </div>
 
                 <div class="form-floating mt-3">
-                    <input id="floatingPassword" v-model="password" type="password" class="form-control" :placeholder='$t("Password")' required>
-                    <label for="floatingPassword">{{ $t("Password") }}</label>
+                    <input id="pin" v-model="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="6-digit PIN" required>
+                    <label for="pin">6-digit PIN</label>
                 </div>
 
                 <div class="form-floating mt-3">
-                    <input id="repeat" v-model="repeatPassword" type="password" class="form-control" :placeholder='$t("Repeat Password")' required>
-                    <label for="repeat">{{ $t("Repeat Password") }}</label>
+                    <input id="repeat" v-model="repeatPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="Repeat PIN" required>
+                    <label for="repeat">Repeat PIN</label>
                 </div>
+
+                <div class="mt-3"><label for="role" class="form-label">I am a</label><select id="role" v-model="role" class="form-select"><option value="learner">Learner</option><option value="teacher">Teacher</option></select></div>
 
                 <button class="w-100 btn btn-primary mt-3" type="submit" :disabled="processing">
                     {{ $t("Create") }}
                 </button>
+                <router-link class="d-block mt-3" to="/login">Already have an account? Log in</router-link>
             </form>
         </div>
     </div>

@@ -25,7 +25,7 @@ const hideFooter = computed(() => route.meta?.hideFooter);
 </template>
 
 <style lang="scss" scoped>
-@import "../styles/vars.scss";
+@use "../styles/vars.scss" as *;
 
 footer {
     text-align: center;

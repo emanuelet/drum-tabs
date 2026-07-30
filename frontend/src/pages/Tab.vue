@@ -1606,21 +1606,22 @@ export default defineComponent({
                         Speed: {{ bpm }} BPM
                     </button>
                     <div class="speed-selector-popover" v-if="showSpeedSelector">
-                    <div class="speed-selector-header">
-                        <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
-                        <label class="visually-hidden" for="bpm-input">BPM</label>
-                        <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM" @change="setBpm($event.target.value)" />
-                        <span>BPM</span>
-                        <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
-                    </div>
-                    <div class="speed-scale">
-                        <span v-for="mark in speedMarks" :key="mark" class="speed-mark" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }">{{ mark }}</span>
-                        <div class="speed-ticks" aria-hidden="true">
-                            <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
+                        <div class="speed-selector-header">
+                            <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
+                            <label class="visually-hidden" for="bpm-input">BPM</label>
+                            <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
+                                @change="setBpm($event.target.value)" />
+                            <span>BPM</span>
+                            <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
                         </div>
-                        <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
-                        <span class="speed-unit">%</span>
-                    </div>
+                        <div class="speed-scale">
+                            <span v-for="mark in speedMarks" :key="mark" class="speed-mark" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }">{{ mark }}</span>
+                            <div class="speed-ticks" aria-hidden="true">
+                                <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
+                            </div>
+                            <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
+                            <span class="speed-unit">%</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1712,7 +1713,8 @@ export default defineComponent({
 </template>
 
 <style scoped lang="scss">
-@import "../styles/vars.scss";
+@use "sass:color";
+@use "../styles/vars.scss" as *;
 
 $toolbar-height: 60px;
 $youtube-height: 200px;
@@ -1862,7 +1864,7 @@ $padding: 20px;
         white-space: nowrap;
 
         &:hover {
-            background-color: lighten($color, 10%);
+            background-color: color.adjust($color, $lightness: 10%);
         }
     }
 }
@@ -1886,17 +1888,17 @@ $padding: 20px;
         position: sticky;
         top: 0;
         background-color: $color;
-        border-bottom: 1px solid darken($color, 5%);
+        border-bottom: 1px solid color.adjust($color, $lightness: -5%);
     }
 
     .item {
         cursor: pointer;
         display: flex;
         align-items: center;
-        border-bottom: 1px solid darken($color, 5%);
+        border-bottom: 1px solid color.adjust($color, $lightness: -5%);
 
         &.active {
-            background-color: lighten($color, 8%);
+            background-color: color.adjust($color, $lightness: 8%);
         }
 
         .name {
@@ -1904,10 +1906,10 @@ $padding: 20px;
             font-weight: bold;
             padding: $padding;
             height: 100%;
-            border-right: 1px solid darken($color, 5%);
+            border-right: 1px solid color.adjust($color, $lightness: -5%);
 
             &:hover {
-                background-color: lighten($color, 2%);
+                background-color: color.adjust($color, $lightness: 2%);
             }
         }
     }
@@ -1916,17 +1918,17 @@ $padding: 20px;
 .track-list {
     .track {
         .list-button {
-            background-color: lighten($color, 10%);
-            border-right: 1px solid darken($color, 5%);
+            background-color: color.adjust($color, $lightness: 10%);
+            border-right: 1px solid color.adjust($color, $lightness: -5%);
             padding: $padding;
             height: 100%;
 
             &:hover {
-                background-color: lighten($primary, 5%);
+                background-color: color.adjust($primary, $lightness: 5%);
             }
 
             &.active {
-                background-color: lighten($primary, 8%);
+                background-color: color.adjust($primary, $lightness: 8%);
             }
         }
     }
@@ -2028,9 +2030,16 @@ $padding: 20px;
         stroke-width: 1.2;
     }
 
-    .drum-note { stroke: none; }
-    .drum-glyph { fill: none; }
-    .drum-ledger { fill: none; stroke-width: 1; }
+    .drum-note {
+        stroke: none;
+    }
+    .drum-glyph {
+        fill: none;
+    }
+    .drum-ledger {
+        fill: none;
+        stroke-width: 1;
+    }
 
     .note::after {
         position: absolute;
@@ -2044,17 +2053,32 @@ $padding: 20px;
         transform: translateX(-50%) rotate(-25deg);
     }
 
-    .x { color: #e2e2e5; }
-    .circle-x { font-size: 21px; }
-    .foot { align-self: end; margin-top: 35px; }
+    .x {
+        color: #e2e2e5;
+    }
+    .circle-x {
+        font-size: 21px;
+    }
+    .foot {
+        align-self: end;
+        margin-top: 35px;
+    }
 }
 
 .drum-notation-group.bass,
 .drum-notation-group.snare,
-.drum-notation-group.ride { grid-template-columns: 1fr; }
-.drum-notation-group.hihat { grid-template-columns: repeat(3, 1fr); }
-.drum-notation-group.tom { grid-template-columns: repeat(3, 1fr); }
-.drum-notation-group.crash { grid-template-columns: 1fr; }
+.drum-notation-group.ride {
+    grid-template-columns: 1fr;
+}
+.drum-notation-group.hihat {
+    grid-template-columns: repeat(3, 1fr);
+}
+.drum-notation-group.tom {
+    grid-template-columns: repeat(3, 1fr);
+}
+.drum-notation-group.crash {
+    grid-template-columns: 1fr;
+}
 
 .select-percentage {
     display: flex;

@@ -1,41 +1,38 @@
 import { serve, ServerType } from "@hono/node-server";
 import { Context, Hono } from "@hono/hono";
 import * as fs from "@std/fs";
+import { auth, checkLogin, getCurrentSession, getCurrentUser, isFinishSetup, isLoggedIn, requireTeacher } from "./auth.ts";
 import {
-    auth,
-    checkLogin,
-    getCurrentSession,
-    isFinishSetup,
-    isLoggedIn,
-} from "./auth.ts";
-import {
-    SignUpSchema,
+    CreateAssignmentSchema,
     CreateExerciseSchema,
+    PinSchema,
+    RegisterSchema,
+    SyncRequestSchema,
     UpdateExerciseFavSchema,
     UpdateExerciseSchema,
-    SyncRequestSchema,
     UpdateTabFavSchema,
     UpdateTabInfoSchema,
     YoutubeAddDataSchema,
 } from "./zod.ts";
 import { createExercise, deleteExercise, getAllExercises, updateExercise, updateExerciseFav } from "./exercise.ts";
-import { db, hasUser, isInitDB, kv, migrate } from "./db.ts";
+import {
+    connectStudent,
+    createAssignment,
+    db,
+    deleteAssignment,
+    disconnectStudent,
+    getLearnerAssignments,
+    getStudents,
+    getTeacherAssignments,
+    isInitDB,
+    kv,
+    migrate,
+    searchLearners,
+    setUserRole,
+} from "./db.ts";
 import { cors } from "@hono/hono/cors";
 import { serveStatic } from "@hono/hono/deno";
-import {
-    appVersion,
-    checkFilename,
-    dataDir,
-    devOriginList,
-    getFrontendDir,
-    getSourceDir,
-    host,
-    isDemoMode,
-    isDev,
-    port,
-    start,
-    tabDir,
-} from "./util.ts";
+import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getSourceDir, host, isDemoMode, isDev, port, start, tabDir } from "./util.ts";
 import * as path from "@std/path";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
 import { parseDrumTab } from "./drum_parser.ts";
@@ -67,12 +64,7 @@ import sanitize from "sanitize-filename";
 import "@std/dotenv/load";
 import { socketIO } from "./socket.ts";
 import * as cheerio from "cheerio";
-import {
-    downloadUltimateGuitarFile,
-    getUltimateGuitarTab,
-    searchUltimateGuitar,
-    UltimateGuitarError,
-} from "./ultimate-guitar.ts";
+import { downloadUltimateGuitarFile, getUltimateGuitarTab, searchUltimateGuitar, UltimateGuitarError } from "./ultimate-guitar.ts";
 
 let httpServer: ServerType;
 
@@ -166,6 +158,18 @@ export async function main() {
         );
     }
 
+    // The custom registration route below is the only way to select an app role.
+    app.post("/api/auth/sign-up/email", (c) => c.json({ error: "Use /api/register" }, 404));
+    app.post("/api/auth/sign-in/email", async (c) => {
+        try {
+            const body = await c.req.raw.clone().json() as { password?: unknown };
+            PinSchema.parse(body.password);
+            return auth.handler(c.req.raw);
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
     // Better-Auth routes
     app.all("/api/auth/*", (c) => {
         return auth.handler(c.req.raw);
@@ -176,18 +180,14 @@ export async function main() {
         return c.json(isFinishSetup());
     });
 
-    // Register Admin account
-    app.post("/register", async (c) => {
+    app.post("/api/register", async (c) => {
         try {
-            if (hasUser()) {
-                return c.json({ error: "User already exists" }, 400);
-            }
-
-            const body = SignUpSchema.parse(await c.req.json());
+            const body = RegisterSchema.parse(await c.req.json());
 
             const data = await auth.api.signUpEmail({
-                body,
+                body: { email: body.email, name: body.name, password: body.pin },
             });
+            setUserRole(data.user.id, body.role);
 
             return c.json(data);
         } catch (e) {
@@ -196,6 +196,85 @@ export async function main() {
             } else {
                 return c.json({ error: "Unknown error" }, 400);
             }
+        }
+    });
+
+    app.get("/api/me", async (c) => {
+        try {
+            return c.json({ ok: true, user: await getCurrentUser(c) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.get("/api/learners", async (c) => {
+        try {
+            await requireTeacher(c);
+            return c.json({ ok: true, learners: searchLearners(c.req.query("query") || "") });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.get("/api/students", async (c) => {
+        try {
+            const teacher = await requireTeacher(c);
+            return c.json({ ok: true, students: getStudents(teacher.id), assignments: getTeacherAssignments(teacher.id) });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/students/:learnerId", async (c) => {
+        try {
+            const teacher = await requireTeacher(c);
+            connectStudent(teacher.id, c.req.param("learnerId"));
+            return c.json({ ok: true });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.delete("/api/students/:learnerId", async (c) => {
+        try {
+            const teacher = await requireTeacher(c);
+            disconnectStudent(teacher.id, c.req.param("learnerId"));
+            return c.json({ ok: true });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.post("/api/assignments", async (c) => {
+        try {
+            const teacher = await requireTeacher(c);
+            const data = CreateAssignmentSchema.parse(await c.req.json());
+            if (data.resourceType === "exercise" && !(await getAllExercises()).some((exercise) => exercise.id === data.resourceId)) throw new Error("Exercise not found");
+            if (data.resourceType === "tab") await checkTabExists(data.resourceId);
+            const id = createAssignment(teacher.id, data.learnerId, data.resourceType, data.resourceId);
+            return c.json({ ok: true, id });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.delete("/api/assignments/:id", async (c) => {
+        try {
+            const teacher = await requireTeacher(c);
+            deleteAssignment(teacher.id, c.req.param("id"));
+            return c.json({ ok: true });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    app.get("/api/assignments", async (c) => {
+        try {
+            const user = await getCurrentUser(c);
+            const assignments = user.role === "teacher" ? getTeacherAssignments(user.id) : getLearnerAssignments(user.id);
+            return c.json({ ok: true, assignments });
+        } catch (e) {
+            return generalError(c, e);
         }
     });
 
@@ -261,24 +340,17 @@ export async function main() {
             if (file instanceof File) {
                 content = await file.text();
             } else {
-                if (typeof text !== "string" || !text.trim())
+                if (typeof text !== "string" || !text.trim()) {
                     throw new Error("No drum tab uploaded or pasted");
+                }
                 content = text;
             }
             const parsed = parseDrumTab(content);
             const titleValue = form.get("title");
             const artistValue = form.get("artist");
-            const title =
-                typeof titleValue === "string" && titleValue.trim()
-                    ? titleValue.trim()
-                    : parsed.title ||
-                      (file instanceof File
-                          ? file.name.replace(/\.txt$/i, "")
-                          : "Untitled drum tab");
-            const artist =
-                typeof artistValue === "string"
-                    ? artistValue.trim()
-                    : parsed.artist || "";
+            const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : parsed.title ||
+                (file instanceof File ? file.name.replace(/\.txt$/i, "") : "Untitled drum tab");
+            const artist = typeof artistValue === "string" ? artistValue.trim() : parsed.artist || "";
             const originalFilename = `${file instanceof File ? file.name.replace(/\.[^.]+$/, "") : "drum-tab"}.gp`;
             const id = await createTab(
                 toGp7({ ...parsed, title, artist }),
@@ -347,10 +419,7 @@ export async function main() {
         try {
             await checkLogin(c);
             const query = c.req.query("query") || "";
-            const mode =
-                c.req.query("mode") === "ascii-drums"
-                    ? "ascii-drums"
-                    : "guitar-pro";
+            const mode = c.req.query("mode") === "ascii-drums" ? "ascii-drums" : "guitar-pro";
             const page = Number.parseInt(c.req.query("page") || "1", 10);
             const results = await searchUltimateGuitar(
                 query,
@@ -388,8 +457,7 @@ export async function main() {
             return new Response(response.body, {
                 status: 200,
                 headers: {
-                    "Content-Type":
-                        response.headers.get("content-type") ||
+                    "Content-Type": response.headers.get("content-type") ||
                         "application/octet-stream",
                 },
             });
@@ -444,13 +512,15 @@ export async function main() {
     // Get Tab List
     app.get("/api/tabs", async (c) => {
         try {
-            await checkLogin(c);
+            const user = await getCurrentUser(c);
 
             const tabList = await getAllTabs();
+            const assignments = user.role === "learner" ? getLearnerAssignments(user.id).filter((assignment) => assignment.resourceType === "tab") : [];
+            const assignmentsByTab = new Map(assignments.map((assignment) => [assignment.resourceId, assignment]));
 
             return c.json({
                 ok: true,
-                tabs: tabList,
+                tabs: tabList.map((tab) => ({ ...tab, teacherAssignment: assignmentsByTab.get(tab.id) || null })),
             });
         } catch (e) {
             return generalError(c, e);
@@ -473,14 +543,11 @@ export async function main() {
 
             config = await fixMissingTab(config);
 
-            const filePath = (await isLoggedIn(c))
-                ? getTabFullFilePath(config.tab)
-                : "";
+            const filePath = (await isLoggedIn(c)) ? getTabFullFilePath(config.tab) : "";
 
             return c.json({
                 ok: true,
-                showOpenButtons:
-                    Deno.build.standalone && Deno.build.os === "windows",
+                showOpenButtons: Deno.build.standalone && Deno.build.os === "windows",
                 tab: config.tab,
                 youtubeList: config.youtube,
                 audioList: config.audio,
@@ -662,15 +729,17 @@ export async function main() {
         try {
             await checkLogin(c);
             const query = c.req.query("q")?.trim();
-            if (!query || query.length > 200)
+            if (!query || query.length > 200) {
                 throw new Error(
                     "Search query must be between 1 and 200 characters",
                 );
+            }
 
             const username = Deno.env.get("YATTEE_USERNAME");
             const password = Deno.env.get("YATTEE_PASSWORD");
-            if (!username || !password)
+            if (!username || !password) {
                 throw new Error("Yattee search is not configured");
+            }
 
             const url = new URL(
                 "/api/v1/search",
@@ -684,8 +753,9 @@ export async function main() {
                     Authorization: `Basic ${btoa(`${username}:${password}`)}`,
                 },
             });
-            if (!response.ok)
+            if (!response.ok) {
                 throw new Error(`Yattee search failed (${response.status})`);
+            }
             const results = (await response.json()) as { videoId?: string }[];
             return c.json({
                 ok: true,
@@ -1038,19 +1108,17 @@ function generalError(c: Context, e: unknown) {
 }
 
 function ultimateGuitarError(c: Context, e: unknown) {
-    if (e instanceof UltimateGuitarError)
+    if (e instanceof UltimateGuitarError) {
         return c.json(
             { ok: false, code: e.code, msg: e.message },
             e.status as 400,
         );
+    }
     return c.json(
         {
             ok: false,
             code: "upstream_error",
-            msg:
-                e instanceof Error
-                    ? e.message
-                    : "Ultimate Guitar request failed",
+            msg: e instanceof Error ? e.message : "Ultimate Guitar request failed",
         },
         502,
     );

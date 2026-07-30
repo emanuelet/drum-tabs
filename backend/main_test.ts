@@ -6,7 +6,7 @@ async function setupTest() {
     // Set up temporary directory for tests
     const tempDir = await Deno.makeTempDir();
     Deno.env.set("DATA_DIR", tempDir);
-    Deno.env.set("MYTABS_PORT", "47778");
+    Deno.env.set("MYTABS_PORT", Deno.env.get("MYTABS_TEST_PORT") || "47778");
     return tempDir;
 }
 
@@ -27,7 +27,7 @@ await main();
 // Wait a moment for server to be ready
 await new Promise((res) => setTimeout(res, 5000));
 
-const baseURL = `http://127.0.0.1:47778`;
+const baseURL = `http://127.0.0.1:${Deno.env.get("MYTABS_PORT")}`;
 
 Deno.test({
     name: "private tab endpoints require authentication (HTTP)",
@@ -126,10 +126,10 @@ Deno.test({
     sanitizeResources: false,
     fn: async () => {
         // Register a new user
-        const signupRes = await fetch(`${baseURL}/api/auth/sign-up/email`, {
+        const signupRes = await fetch(`${baseURL}/api/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: "test+ci@example.com", name: "CI Test", password: "password123" }),
+            body: JSON.stringify({ email: "test+ci@example.com", name: "CI Test", role: "learner", pin: "123456" }),
         });
         const signupJson = await signupRes.json();
         // sign up should succeed
@@ -139,7 +139,7 @@ Deno.test({
         const signInRes = await fetch(`${baseURL}/api/auth/sign-in/email`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: "test+ci@example.com", password: "password123" }),
+            body: JSON.stringify({ email: "test+ci@example.com", password: "123456" }),
         });
 
         console.log("Sign-in response status:", signInRes.status);
@@ -204,6 +204,99 @@ Deno.test({
         assertExists(importedConfig);
         assertEquals(importedConfig.tab.filename.endsWith(".gp"), true);
         assertEquals(importedConfig.tab.originalFilename, "drum-tab.gp");
+    },
+});
+
+Deno.test({
+    name: "teachers connect learners and assign tabs and exercises",
+    sanitizeOps: false,
+    sanitizeResources: false,
+    fn: async () => {
+        async function registerAndSignIn(email: string, name: string, role: "teacher" | "learner") {
+            const register = await fetch(`${baseURL}/api/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, name, role, pin: "123456" }),
+            });
+            assertEquals(register.status, 200, await register.text());
+
+            const signIn = await fetch(`${baseURL}/api/auth/sign-in/email`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password: "123456" }),
+            });
+            assertEquals(signIn.status, 200, await signIn.text());
+            const cookie = signIn.headers.get("set-cookie");
+            assertExists(cookie);
+            return cookie.split(";", 1)[0];
+        }
+
+        const teacherCookie = await registerAndSignIn("teacher@example.com", "Teacher", "teacher");
+        const learnerCookie = await registerAndSignIn("learner@example.com", "Learner", "learner");
+        const unconnectedLearnerCookie = await registerAndSignIn("unconnected@example.com", "Unconnected Learner", "learner");
+
+        const teacherMe = await fetch(`${baseURL}/api/me`, { headers: { Cookie: teacherCookie } });
+        assertEquals((await teacherMe.json()).user.role, "teacher");
+        const learnerMe = await fetch(`${baseURL}/api/me`, { headers: { Cookie: learnerCookie } });
+        const learner = (await learnerMe.json()).user;
+        assertEquals(learner.role, "learner");
+
+        const invalidPin = await fetch(`${baseURL}/api/auth/sign-in/email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: "learner@example.com", password: "not-a-pin" }),
+        });
+        assertEquals(invalidPin.status, 400);
+        assertEquals((await fetch(`${baseURL}/api/auth/sign-up/email`, { method: "POST" })).status, 404);
+
+        const learnerDirectory = await fetch(`${baseURL}/api/learners`, { headers: { Cookie: teacherCookie } });
+        assertEquals(learnerDirectory.status, 200);
+        assertEquals((await learnerDirectory.json()).learners.length, 0);
+        const learnerSearch = await fetch(`${baseURL}/api/learners?query=learner`, { headers: { Cookie: teacherCookie } });
+        const learnerSearchResults = (await learnerSearch.json()).learners;
+        assertEquals(learnerSearchResults.some((item: { id: string }) => item.id === learner.id), true);
+        assertEquals((await fetch(`${baseURL}/api/learners`, { headers: { Cookie: learnerCookie } })).status, 400);
+
+        const unconnectedLearner = (await (await fetch(`${baseURL}/api/me`, { headers: { Cookie: unconnectedLearnerCookie } })).json()).user;
+        const exercises = await fetch(`${baseURL}/api/exercises`, { headers: { Cookie: teacherCookie } });
+        const exerciseId = (await exercises.json()).exercises[0].id;
+        const unconnectedAssignment = await fetch(`${baseURL}/api/assignments`, {
+            method: "POST",
+            headers: { Cookie: teacherCookie, "Content-Type": "application/json" },
+            body: JSON.stringify({ learnerId: unconnectedLearner.id, resourceType: "exercise", resourceId: exerciseId }),
+        });
+        assertEquals(unconnectedAssignment.status, 400);
+
+        const connect = await fetch(`${baseURL}/api/students/${learner.id}`, { method: "POST", headers: { Cookie: teacherCookie } });
+        assertEquals(connect.status, 200);
+
+        const assignment = await fetch(`${baseURL}/api/assignments`, {
+            method: "POST",
+            headers: { Cookie: teacherCookie, "Content-Type": "application/json" },
+            body: JSON.stringify({ learnerId: learner.id, resourceType: "exercise", resourceId: exerciseId }),
+        });
+        assertEquals(assignment.status, 200);
+        assertEquals((await fetch(`${baseURL}/api/assignments`, { headers: { Cookie: learnerCookie } })).status, 200);
+        const learnerAssignments = await (await fetch(`${baseURL}/api/assignments`, { headers: { Cookie: learnerCookie } })).json();
+        assertEquals(learnerAssignments.assignments[0].resourceId, exerciseId);
+
+        const tabId = await createTab(new Uint8Array([1, 2, 3]), "gp", "Assigned Tab", "Teacher", "assigned.gp");
+        const tabAssignment = await fetch(`${baseURL}/api/assignments`, {
+            method: "POST",
+            headers: { Cookie: teacherCookie, "Content-Type": "application/json" },
+            body: JSON.stringify({ learnerId: learner.id, resourceType: "tab", resourceId: tabId }),
+        });
+        assertEquals(tabAssignment.status, 200);
+        const learnerTabs = await (await fetch(`${baseURL}/api/tabs`, { headers: { Cookie: learnerCookie } })).json();
+        const assignedTab = learnerTabs.tabs.find((tab: { id: string }) => tab.id === tabId);
+        assertEquals(assignedTab.teacherAssignment.teacherName, "Teacher");
+
+        const forbiddenAssignment = await fetch(`${baseURL}/api/assignments`, {
+            method: "POST",
+            headers: { Cookie: learnerCookie, "Content-Type": "application/json" },
+            body: JSON.stringify({ learnerId: learner.id, resourceType: "exercise", resourceId: exerciseId }),
+        });
+        assertEquals(forbiddenAssignment.status, 400);
     },
 });
 
