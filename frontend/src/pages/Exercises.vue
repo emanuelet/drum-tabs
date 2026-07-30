@@ -2,6 +2,7 @@
 import { defineComponent } from "vue";
 import { baseURL, getSetting } from "../app.js";
 import { notify } from "@kyvg/vue3-notification";
+import AssignButton from "../components/AssignButton.vue";
 
 const alphaTab = await import("@coderline/alphatab");
 
@@ -41,6 +42,7 @@ function splitExerciseTracks(alphaTex, title) {
 }
 
 export default defineComponent({
+    components: { AssignButton },
     data() {
         return {
             exercises: [],
@@ -58,6 +60,8 @@ export default defineComponent({
             selectedTrackIndex: 0,
             saving: false,
             ready: false,
+            assignmentsByExercise: {},
+            user: null,
         };
     },
     computed: {
@@ -87,10 +91,20 @@ export default defineComponent({
         });
         this.api.playerStateChanged.on((event) => this.playing = event.state === alphaTab.synth.PlayerState.Playing);
         try {
-            const res = await fetch(baseURL + "/api/exercises", { credentials: "include" });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.msg || "Failed to load exercises");
+            const [exerciseRes, assignmentRes, userRes] = await Promise.all([
+                fetch(baseURL + "/api/exercises", { credentials: "include" }),
+                fetch(baseURL + "/api/assignments", { credentials: "include" }),
+                fetch(baseURL + "/api/me", { credentials: "include" }),
+            ]);
+            const data = await exerciseRes.json();
+            const assignmentData = await assignmentRes.json();
+            if (!exerciseRes.ok) throw new Error(data.msg || "Failed to load exercises");
+            if (!assignmentRes.ok) throw new Error(assignmentData.msg || "Failed to load assignments");
             this.exercises = data.exercises;
+            this.assignmentsByExercise = Object.fromEntries(
+                assignmentData.assignments.filter((assignment) => assignment.resourceType === "exercise").map((assignment) => [assignment.resourceId, assignment]),
+            );
+            if (userRes.ok) this.user = (await userRes.json()).user;
             this.selected = this.exercises[0] || null;
             this.loadExercise();
             this.ready = true;
@@ -148,9 +162,7 @@ export default defineComponent({
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.msg || "Failed to save exercise");
-                this.exercises = this.editingExercise
-                    ? this.exercises.map((exercise) => exercise.id === data.exercise.id ? data.exercise : exercise)
-                    : [...this.exercises, data.exercise];
+                this.exercises = this.editingExercise ? this.exercises.map((exercise) => exercise.id === data.exercise.id ? data.exercise : exercise) : [...this.exercises, data.exercise];
                 this.alphaTex = "";
                 this.editingExercise = null;
                 this.alphaTexAnalysis = null;
@@ -278,24 +290,23 @@ export default defineComponent({
                 <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
                 <label><input v-model="metronome" type="checkbox" /> Metronome</label>
                 <label><input v-model="looping" type="checkbox" /> Loop</label>
-                <label v-if="exerciseTracks.length > 1" class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
+                <label v-if="exerciseTracks.length > 1"
+                    class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
             </div>
             <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
             <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
         </section>
-        <section v-if="ready" class="favorites">
+        <section v-if="ready && favoriteExercises.length" class="favorites">
             <div class="preset-heading">
                 <h2>Favorites</h2>
             </div>
             <div class="exercise-grid">
                 <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
-                    <button class="exercise-select" @click="selectExercise(exercise)">
-                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small>
-                    </button>
-                    <button class="btn btn-sm btn-outline-warning" type="button" @click="toggleFav(exercise)">Unfavorite</button>
+                    <button class="exercise-select"
+                        @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
+                    <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites" @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
                 </article>
             </div>
-            <p v-if="favoriteExercises.length === 0" class="text-muted mt-3">Favorite exercises to keep them here.</p>
         </section>
         <section v-if="ready" class="all-exercises">
             <div class="preset-heading">
@@ -312,27 +323,37 @@ export default defineComponent({
             <div class="exercise-list">
                 <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected.id === exercise.id }">
                     <button class="exercise-select" @click="selectExercise(exercise)">
-                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small>
+                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em>
                     </button>
-                    <button class="btn btn-sm" :class="exercise.fav ? 'btn-outline-warning' : 'btn-outline-secondary'" type="button" @click="toggleFav(exercise)">{{ exercise.fav ? "Unfavorite" : "Favorite" }}</button>
-                    <button class="btn btn-sm btn-outline-secondary" type="button" @click="openEditDialog(exercise)">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" type="button" @click="deleteExercise(exercise)">Delete</button>
+                    <button class="star-button" type="button" :title="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
+                        :aria-label="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
+                        @click="toggleFav(exercise)"><font-awesome-icon :icon="exercise.fav ? 'star' : ['far', 'star']" /></button>
+                    <AssignButton v-if="user?.role === 'teacher'" outline resource-type="exercise" :resource-id="exercise.id" :resource-title="exercise.title" />
+                    <button class="btn btn-sm btn-outline-secondary icon-button" type="button" title="Edit exercise" aria-label="Edit exercise"
+                        @click="openEditDialog(exercise)"><font-awesome-icon icon="pen" /></button>
+                    <button class="btn btn-sm btn-outline-danger icon-button" type="button" title="Delete exercise" aria-label="Delete exercise"
+                        @click="deleteExercise(exercise)"><font-awesome-icon icon="trash-can" /></button>
                 </article>
             </div>
             <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
         </section>
         <dialog ref="addDialog" class="add-dialog">
             <form @submit.prevent="saveExercise">
-                <div class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
+                <div
+                    class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
                 <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>, or import a Guitar Pro file. The subtitle is optional.</p>
                 <label class="btn btn-outline-secondary import-guitar-pro">Import Guitar Pro<input type="file" accept=".gp,.gpx,.gp3,.gp4,.gp5" @change="importGuitarPro" /></label>
                 <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
                 <div v-if="alphaTexAnalysis" class="alphatex-analysis" :class="alphaTexAnalysis.valid ? 'valid' : 'invalid'">
                     <strong>{{ alphaTexAnalysis.valid ? "Syntax valid" : "Syntax invalid" }}</strong>
-                    <span v-if="alphaTexAnalysis.valid">{{ alphaTexAnalysis.title }}<template v-if="alphaTexAnalysis.subtitle"> - {{ alphaTexAnalysis.subtitle }}</template> · {{ alphaTexAnalysis.tempo }} BPM</span>
-                    <ul v-else><li v-for="diagnostic in alphaTexAnalysis.diagnostics" :key="diagnostic">{{ diagnostic }}</li></ul>
+                    <span
+                        v-if="alphaTexAnalysis.valid">{{ alphaTexAnalysis.title }}<template v-if="alphaTexAnalysis.subtitle"> - {{ alphaTexAnalysis.subtitle }}</template> · {{ alphaTexAnalysis.tempo }} BPM</span>
+                    <ul v-else>
+                        <li v-for="diagnostic in alphaTexAnalysis.diagnostics" :key="diagnostic">{{ diagnostic }}</li>
+                    </ul>
                 </div>
-                <div class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
+                <div
+                    class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
             </form>
         </dialog>
     </main>
@@ -375,23 +396,6 @@ header {
     display: flex;
     gap: 8px;
 }
-.exercise-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
-}
-.exercise-card {
-    text-align: left;
-    padding: 16px;
-    border: 1px solid #555;
-    background: transparent;
-    color: inherit;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-}
 .exercise-select {
     border: 0;
     padding: 0;
@@ -399,6 +403,33 @@ header {
     color: inherit;
     background: transparent;
     text-align: left;
+}
+.exercise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+.exercise-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    color: inherit;
+    background: transparent;
+    border: 1px solid #555;
+    border-radius: 8px;
+}
+.exercise-card.active {
+    border-color: #d87d30;
+    box-shadow: inset 0 0 0 1px #d87d30;
+}
+.exercise-card span,
+.exercise-card small {
+    display: block;
+    margin-top: 8px;
+}
+.exercise-card small {
+    opacity: .7;
 }
 .exercise-list {
     border: 1px solid #555;
@@ -427,17 +458,28 @@ header {
     margin-left: 8px;
     opacity: .7;
 }
-.exercise-card.active {
-    border-color: #d87d30;
-    box-shadow: inset 0 0 0 1px #d87d30;
+.exercise-row em {
+    color: #d87d30;
+    font-style: normal;
+    font-weight: 700;
 }
-.exercise-card span,
-.exercise-card small {
-    display: block;
-    margin-top: 8px;
+.star-button {
+    align-self: flex-start;
+    padding: 0;
+    color: #9e9e9e;
+    background: none;
+    border: 0;
+    font-size: 20px;
 }
-.exercise-card small {
-    opacity: .7;
+.star-button:hover,
+.exercise-card .star-button {
+    color: #ffa500;
+}
+.exercise-row .star-button {
+    align-self: center;
+}
+.icon-button {
+    min-width: 34px;
 }
 .player {
     border: 1px solid #555;

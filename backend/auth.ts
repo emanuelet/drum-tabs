@@ -1,13 +1,13 @@
 import { betterAuth } from "better-auth";
-import { db, hasUser } from "./db.ts";
+import { db, getUserRole, hasUser } from "./db.ts";
 import * as fs from "@std/fs";
 import { randomBytes } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { devOriginList } from "./util.ts";
-import { createAuthMiddleware } from "better-auth/api";
 import * as path from "@std/path";
 import { dataDir } from "./util.ts";
 import { Context } from "@hono/hono";
+import { UserRole } from "./zod.ts";
 
 const configJSONPath = path.join(dataDir, "config.json");
 
@@ -18,19 +18,8 @@ export const auth = betterAuth({
     trustedOrigins: ["*"],
     emailAndPassword: {
         enabled: true,
+        minPasswordLength: 6,
         disableSignUp: isDisableSignUp(),
-    },
-    hooks: {
-        after: createAuthMiddleware(async (ctx) => {
-            if (ctx.path.startsWith("/sign-up")) {
-                const newSession = ctx.context.newSession;
-                if (newSession) {
-                    console.log("First user created: " + newSession.user.email);
-                    console.log("Disable sign up after first user created");
-                    disableSignUp();
-                }
-            }
-        }),
     },
 });
 
@@ -68,7 +57,7 @@ export function isFinishSetup() {
 }
 
 export function isDisableSignUp() {
-    return hasUser();
+    return Deno.env.get("MYTABS_DISABLE_SIGN_UP") === "true";
 }
 
 export function disableSignUp() {
@@ -94,6 +83,17 @@ export async function getCurrentSession(c: Context) {
         throw new Error("Not logged in");
     }
     return session;
+}
+
+export async function getCurrentUser(c: Context) {
+    const session = await getCurrentSession(c);
+    return { ...session.user, role: getUserRole(session.user.id) as UserRole };
+}
+
+export async function requireTeacher(c: Context) {
+    const user = await getCurrentUser(c);
+    if (user.role !== "teacher") throw new Error("Teacher access required");
+    return user;
 }
 
 async function generateRandomSecret() {

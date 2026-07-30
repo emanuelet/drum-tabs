@@ -3,6 +3,7 @@ import { defineComponent } from "vue";
 import { BButton, BButtonGroup, BFormInput, BSpinner } from "bootstrap-vue-next";
 import { authClient, isLoggedIn } from "../auth-client.ts";
 import Logo from "../components/Logo.vue";
+import { baseURL } from "../app.ts";
 
 export default defineComponent({
     components: {
@@ -17,10 +18,15 @@ export default defineComponent({
             isLoggedIn: false,
             ready: false,
             fixedNavbar: false,
+            user: null,
         };
     },
     async mounted() {
         this.isLoggedIn = await isLoggedIn();
+        if (this.isLoggedIn) {
+            const res = await fetch(baseURL + "/api/me", { credentials: "include" });
+            if (res.ok) this.user = (await res.json()).user;
+        }
         this.ready = true;
     },
     watch: {
@@ -64,6 +70,11 @@ export default defineComponent({
                         Exercises
                     </router-link>
 
+                    <router-link to="/students" v-if="user?.role === 'teacher'">
+                        <font-awesome-icon :icon='["fas", "folder"]' />
+                        Students
+                    </router-link>
+
                     <router-link to="/settings">
                         <font-awesome-icon :icon='["fas", "gear"]' />
                         Settings
@@ -96,7 +107,7 @@ export default defineComponent({
 </template>
 
 <style lang="scss" scoped>
-@import "../styles/vars.scss";
+@use "../styles/vars.scss" as *;
 
 $navHeight: 100px;
 
@@ -131,7 +142,7 @@ $navHeight: 100px;
         display: flex;
         justify-content: space-between;
 
-        &>div {
+        & > div {
             flex-grow: 4;
             display: flex;
             column-gap: 50px;
@@ -144,7 +155,7 @@ $navHeight: 100px;
                 justify-content: flex-end;
             }
 
-            &>a {
+            & > a {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -179,7 +190,7 @@ $navHeight: 100px;
         .toolbar {
             padding: 0 0 0 10px;
 
-            &>div {
+            & > div {
                 column-gap: 10px;
             }
         }

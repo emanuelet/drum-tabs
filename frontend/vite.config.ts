@@ -24,6 +24,13 @@ export default defineConfig({
         outDir: "../dist",
         emptyOutDir: true,
     },
+    css: {
+        preprocessorOptions: {
+            scss: {
+                quietDeps: true,
+            },
+        },
+    },
     plugins: [
         vue(),
         alphaTab(),

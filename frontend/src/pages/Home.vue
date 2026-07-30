@@ -17,6 +17,7 @@ export default defineComponent({
             isLoggedIn: false,
             searchQuery: "",
             setting: {},
+            user: null,
         };
     },
 
@@ -30,9 +31,14 @@ export default defineComponent({
         }
 
         try {
-            const res = await fetch(baseURL + "/api/tabs", { credentials: "include" });
-            const data = await res.json();
+            const [tabsRes, userRes] = await Promise.all([
+                fetch(baseURL + "/api/tabs", { credentials: "include" }),
+                fetch(baseURL + "/api/me", { credentials: "include" }),
+            ]);
+            const data = await tabsRes.json();
+            if (!tabsRes.ok) throw new Error(data.msg || "Unable to load tabs");
             this.tabList = data.tabs;
+            if (userRes.ok) this.user = (await userRes.json()).user;
             this.ready = true;
 
             await this.$nextTick();
@@ -139,6 +145,8 @@ export default defineComponent({
                 :key="`fav-${tab.id}`"
                 :tab="tab"
                 :show-artist="true"
+                :can-assign="user?.role === 'teacher'"
+                :can-show-teacher-assignment="user?.role === 'learner'"
                 @delete="deleteTab"
                 @favToggled="handleFavToggled"
             />
@@ -187,6 +195,8 @@ export default defineComponent({
                     :key="tab.id"
                     :tab="tab"
                     :show-artist="false"
+                    :can-assign="user?.role === 'teacher'"
+                    :can-show-teacher-assignment="user?.role === 'learner'"
                     @delete="deleteTab"
                     @favToggled="handleFavToggled"
                 />
@@ -199,6 +209,8 @@ export default defineComponent({
                 :key="tab.id"
                 :tab="tab"
                 :show-artist="true"
+                :can-assign="user?.role === 'teacher'"
+                :can-show-teacher-assignment="user?.role === 'learner'"
                 @delete="deleteTab"
                 @favToggled="handleFavToggled"
             />
@@ -218,7 +230,7 @@ export default defineComponent({
 </template>
 
 <style scoped lang="scss">
-@import "../styles/vars.scss";
+@use "../styles/vars.scss" as *;
 
 .artist-group {
     h3 {

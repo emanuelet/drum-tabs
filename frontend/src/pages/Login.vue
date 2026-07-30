@@ -11,17 +11,10 @@ export default defineComponent({
         return {
             processing: false,
             email: "",
-            password: "",
+            pin: "",
             rememberMe: true,
             error: "",
         };
-    },
-    async mounted() {
-        const res = await fetch(baseURL + "/api/is-finish-setup");
-        const isFinishSetup = await res.json();
-        if (!isFinishSetup) {
-            this.$router.push("/register");
-        }
     },
     methods: {
         async submit() {
@@ -30,7 +23,7 @@ export default defineComponent({
 
             const { data, error } = await authClient.signIn.email({
                 email: this.email,
-                password: this.password,
+                password: this.pin,
                 rememberMe: this.rememberMe,
             });
 
@@ -67,8 +60,8 @@ export default defineComponent({
                 </div>
 
                 <div class="form-floating mt-3">
-                    <input id="floatingPassword" v-model="password" type="password" class="form-control" :placeholder='$t("Password")' required>
-                    <label for="floatingPassword">{{ $t("Password") }}</label>
+                    <input id="floatingPassword" v-model="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="6-digit PIN" required>
+                    <label for="floatingPassword">6-digit PIN</label>
                 </div>
 
                 <!-- Remember me -->
@@ -88,6 +81,7 @@ export default defineComponent({
                 <div class="error text-danger mt-3" v-if="error">
                     {{ error }}
                 </div>
+                <router-link class="d-block mt-3" to="/register">Create an account</router-link>
             </form>
         </div>
     </div>

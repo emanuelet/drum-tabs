@@ -7,6 +7,26 @@ export const SignUpSchema = z.object({
 });
 export type SignUpData = z.infer<typeof SignUpSchema>;
 
+export const UserRoleSchema = z.enum(["teacher", "learner"]);
+export type UserRole = z.infer<typeof UserRoleSchema>;
+
+export const PinSchema = z.string().regex(/^\d{6}$/, "PIN must be exactly 6 digits");
+
+export const RegisterSchema = z.object({
+    email: z.email(),
+    name: z.string().trim().min(1).max(100),
+    pin: PinSchema,
+    role: UserRoleSchema,
+});
+export type RegisterData = z.infer<typeof RegisterSchema>;
+
+export const CreateAssignmentSchema = z.object({
+    learnerId: z.string().min(1),
+    resourceType: z.enum(["exercise", "tab"]),
+    resourceId: z.string().min(1),
+});
+export type CreateAssignmentData = z.infer<typeof CreateAssignmentSchema>;
+
 const title = z.string().min(1);
 const artist = z.string().min(0);
 const isPublic = z.boolean();

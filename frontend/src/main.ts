@@ -12,6 +12,7 @@ import { i18n } from "./i18n.ts";
 
 // CSS
 import "./styles/main.scss";
+import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
 
 const app = createApp(App);
 app.use(router);
