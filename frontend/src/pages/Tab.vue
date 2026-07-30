@@ -1,5 +1,5 @@
 <script>
-import { ActionBuffer, baseURL, checkFetch, connectSocketIO, convertAlphaTexSyncPoint, generalError, getInstrumentName, getSetting, releaseWakeLock, requestWakeLock } from "../app.js";
+import { ActionBuffer, baseURL, checkFetch, convertAlphaTexSyncPoint, generalError, getInstrumentName, getSetting, releaseWakeLock, requestWakeLock } from "../app.js";
 import { defineComponent } from "vue";
 import { BDropdown, BDropdownDivider, BDropdownItem } from "bootstrap-vue-next";
 import { notify } from "@kyvg/vue3-notification";
@@ -17,11 +17,6 @@ const syncOffsetYoutubeActionBuffer = new ActionBuffer(200);
 const syncOffsetAudioActionBuffer = new ActionBuffer(200);
 
 export default defineComponent({
-    /**
-     * @type {SocketIOClient.Socket}
-     */
-    socket: null,
-
     /**
      * @type {alphaTab.AlphaTabApi}
      */
@@ -403,8 +398,6 @@ export default defineComponent({
             });
         }
 
-        await this.initSocketIO();
-
         console.log("Mounted");
     },
     beforeUnmount() {
@@ -417,7 +410,6 @@ export default defineComponent({
             this._onDocumentClick = undefined;
         }
 
-        this.socket?.disconnect();
     },
     methods: {
         adjustBpm(amount) {
@@ -907,49 +899,6 @@ export default defineComponent({
                     }
                 }
             }
-        },
-
-        async initSocketIO() {
-            if (this.socket) {
-                this.socket.disconnect();
-                this.socket = null;
-            }
-            this.socket = connectSocketIO();
-
-            this.socket.on("connect", () => {
-                console.log("Connected to server");
-            });
-
-            this.socket.on("disconnect", () => {
-                console.log("Disconnected from server");
-            });
-
-            // Play
-            this.socket.on("play", () => {
-                this.play();
-            });
-
-            // Pause
-            this.socket.on("pause", () => {
-                this.pause();
-            });
-
-            // Seek
-            this.socket.on("seek", (time) => {
-                if (!this.api) {
-                    return;
-                }
-                const diff = Math.abs(this.api.timePosition - time);
-                console.log(this.api.timePosition, time, diff);
-                if (diff < 100) {
-                    return;
-                }
-                this.api.timePosition = time;
-            });
-
-            this.socket.on("no-audio", () => {
-                this.currentAudio = "none";
-            });
         },
 
         async audioYoutube(videoID) {

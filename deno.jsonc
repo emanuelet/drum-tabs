@@ -1,6 +1,8 @@
 {
     "version": "1.6.2",
 
+    "nodeModulesDir": "auto",
+
     "unstable": [
         "fmt-component",
         "kv"
@@ -11,15 +13,12 @@
         "start": "deno run --allow-all backend/main.ts",
         "setup": "deno task install-frontend-deps && deno task build-frontend",
 
-        // Addons
-        "mpchc-controller": "deno run --allow-all extra/mpchc-controller.ts",
-
         // Dev
         "dev": "deno task build-frontend && deno run -A npm:concurrently -k -r \"deno run -A npm:wait-on tcp:47777 && deno task frontend-dev\" \"deno task backend-dev\"",
         "frontend-dev": "cd frontend && deno run dev-frontend",
         "backend-dev": "NODE_ENV=development deno run --allow-all --watch backend/main.ts",
         "install-frontend-deps": "cd frontend && deno install",
-        "test": "deno test --allow-all",
+        "test": "deno test --allow-all backend",
         "fmt": "deno fmt && deno lint --fix && cd frontend && deno fmt",
         "check": "deno fmt --check && deno lint && deno check && cd frontend && deno fmt --check",
 
@@ -30,15 +29,17 @@
         "build-frontend": "cd frontend && deno run build",
         "start-with-build": "deno task build-frontend && deno task start",
         "mcp": "deno run --allow-env=DATA_DIR,MYTABS_DEMO_MODE,MYTABS_HOST,MYTABS_PORT --allow-read --allow-write backend/mcp.ts",
-
-        "build-mpchc-controller": "deno compile --allow-all --output=mpchc-controller extra/mpchc-controller.ts"
+        "cloud-typecheck": "deno check --node-modules-dir=auto cloud/worker.ts",
+        "cloud-test": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run --allow-sys npm:vitest run cloud",
+        "cloud-deploy-dry-run": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run npm:wrangler deploy --dry-run"
     },
 
     "lock": false,
 
     "exclude": [
         "frontend",
-        "extra"
+        "extra",
+        "dist"
     ],
 
     // Run `deno fmt` to format your code
@@ -72,12 +73,9 @@
         "@std/jsonc": "jsr:@std/jsonc@~1.0.2",
         "@std/path": "jsr:@std/path@~1.1.4",
         "@types/sanitize-filename": "npm:@types/sanitize-filename@~1.6.3",
-        "@wasm-audio-decoders/flac": "npm:@wasm-audio-decoders/flac@~0.2.10",
         "better-auth": "npm:better-auth@~1.3.34",
         "cheerio": "npm:cheerio@~1.2.0",
         "sanitize-filename": "npm:sanitize-filename@~1.6.4",
-        "socket.io": "npm:socket.io@~4.8.3",
-        "wasm-media-encoders": "npm:wasm-media-encoders@~0.7.0",
         "zod": "npm:zod@~4.4.3"
     }
 }

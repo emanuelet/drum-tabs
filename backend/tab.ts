@@ -1,4 +1,4 @@
-import { checkAudioFormat, checkFilename, flacToOgg, tabDir } from "./util.ts";
+import { checkAudioFormat, checkFilename, tabDir } from "./util.ts";
 import * as fs from "@std/fs";
 import * as path from "@std/path";
 import { AudioData, AudioDataSchema, ConfigJSON, ConfigJSONSchema, SyncRequest, TabInfo, TabInfoSchema, UpdateTabFav, UpdateTabInfo, Youtube, YoutubeSchema } from "./zod.ts";
@@ -355,15 +355,6 @@ export async function addAudio(tab: TabInfo, audioFileData: Uint8Array, original
     // To avoid issues with special characters in filenames in different OS
     let filename = sanitize(originalFilename);
     const tabDirPath = path.join(tabDir, tab.id.toString());
-
-    // If flac, will be converted to ogg, so change extension
-    if (filename.toLowerCase().endsWith(".flac")) {
-        const lastDotIndex = filename.lastIndexOf(".");
-        filename = filename.substring(0, lastDotIndex) + ".ogg";
-
-        // Convert flac to ogg
-        audioFileData = await flacToOgg(audioFileData);
-    }
 
     // Check if file already exists
     const filePath = path.join(tabDirPath, filename);

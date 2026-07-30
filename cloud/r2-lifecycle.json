@@ -1,0 +1,10 @@
+{
+    "Rules": [
+        {
+            "ID": "expire-soft-deleted-tabs",
+            "Status": "Enabled",
+            "Filter": { "Prefix": "deleted/" },
+            "Expiration": { "Days": 30 }
+        }
+    ]
+}

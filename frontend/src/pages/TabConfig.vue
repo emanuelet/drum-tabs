@@ -545,7 +545,7 @@ export default defineComponent({
                         Drop your audio file here
                     </template>
                     <template #description>
-                        Formats: mp3, ogg, flac (flac will be converted to ogg)
+                        Formats: mp3, ogg
                     </template>
                 </Vue3Dropzone>
 
