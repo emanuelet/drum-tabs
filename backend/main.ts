@@ -62,7 +62,6 @@ import {
 import { ZodError } from "zod";
 import sanitize from "sanitize-filename";
 import "@std/dotenv/load";
-import { socketIO } from "./socket.ts";
 import * as cheerio from "cheerio";
 import { downloadUltimateGuitarFile, getUltimateGuitarTab, searchUltimateGuitar, UltimateGuitarError } from "./ultimate-guitar.ts";
 
@@ -143,9 +142,6 @@ export async function main() {
             }
         },
     );
-
-    // Socket Controller
-    const io = socketIO(httpServer);
 
     // CORS for development
     if (isDev()) {

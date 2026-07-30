@@ -27,9 +27,9 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Simple UI/UX
 - Mobile friendly
 - Offer different cursor modes:
-    - No cursor (just auto scroll the tab) - You can use it to learn to coop with drums, not just following the cursor
-    - Highlight the current bar
-    - Follow cursor
+  - No cursor (just auto scroll the tab) - You can use it to learn to coop with drums, not just following the cursor
+  - Highlight the current bar
+  - Follow cursor
 - Notes coloring
 - Dark/Light tab colors
 - Able to show the score view instead of tab view
@@ -38,9 +38,11 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 
 ### Ultimate Guitar search
 
-On the New Tab page, paste the full `Cookie` header copied from an authenticated Ultimate Guitar browser session, choose a search mode, and search for an artist or song. Guitar Pro results are downloaded through the app and checked for a percussion track before import. ASCII results can be copied from the displayed text area.
+On the New Tab page, paste the full `Cookie` header copied from an authenticated Ultimate Guitar browser session, choose a search mode, and search for an artist or song. Guitar Pro results are
+downloaded through the app and checked for a percussion track before import. ASCII results can be copied from the displayed text area.
 
-The cookie is stored only in the browser's local storage and is forwarded only to Ultimate Guitar requests. It is not stored by the server or written to logs. Treat it like a password and clear it when finished. Ultimate Guitar may reject expired sessions, CAPTCHA-protected requests, or excessive traffic.
+The cookie is stored only in the browser's local storage and is forwarded only to Ultimate Guitar requests. It is not stored by the server or written to logs. Treat it like a password and clear it
+when finished. Ultimate Guitar may reject expired sessions, CAPTCHA-protected requests, or excessive traffic.
 
 ## Installation
 
@@ -87,6 +89,11 @@ DATA_DIR=./data deno task mcp
 
 It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP
 client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
+
+## Cloudflare Deployment
+
+Cloudflare deployment is optional and independent from the local Deno library. It uses Workers, D1, and R2; local MCP data is not kept in sync. Setup and one-time import instructions are in
+[`cloud/README.md`](cloud/README.md).
 
 Configure a local MCP client to start it from this repository:
 
