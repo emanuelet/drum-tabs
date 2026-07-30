@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+export {};
+
 /**
  * Global window properties injected by the backend
  */

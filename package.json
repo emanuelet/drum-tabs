@@ -10,16 +10,17 @@
         "typecheck:cloud": "tsc --project cloud/tsconfig.json --noEmit"
     },
     "dependencies": {
-        "@hono/zod-validator": "^0.7.2",
-        "@better-auth/drizzle-adapter": "^1.4.0",
-        "better-auth": "^1.6.25",
+        "@coderline/alphatab": "^1.8.4",
+        "@hono/zod-validator": "^0.9.0",
+        "@better-auth/drizzle-adapter": "^1.6.25",
+        "better-auth": "catalog:",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.11.4",
-        "zod": "^4.1.13"
+        "zod": "catalog:"
     },
     "devDependencies": {
-        "@types/node": "^24.13.3",
-        "typescript": "~5.8.3",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
         "vitest": "^3.2.4",
         "wrangler": "^4.36.0"
     }

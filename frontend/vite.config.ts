@@ -13,7 +13,7 @@ const viteCompressionFilter = /\.(js|mjs|json|css|html|svg)$/i;
 const denoJSONC = jsonc.parse(await Deno.readTextFile("../deno.jsonc"));
 
 // Parse deno.jsonc
-const appVersion: string = denoJSONC.version;
+const appVersion = (denoJSONC as { version: string }).version;
 
 // https://vite.dev/config/
 export default defineConfig({

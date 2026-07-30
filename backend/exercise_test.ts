@@ -1,8 +1,8 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@^1.0.17";
 import * as fs from "@std/fs";
 import * as path from "@std/path";
-// @ts-types="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.d.ts"
-import { importer, Settings } from "@coderline/alphatab";
+// @deno-types="npm:@coderline/alphatab@1.8.4"
+import { importer, Settings } from "@coderline/alphatab-core";
 
 const tempDir = await Deno.makeTempDir();
 Deno.env.set("DATA_DIR", tempDir);

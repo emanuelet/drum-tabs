@@ -69,7 +69,7 @@ export async function checkLogin(c: Context) {
 }
 
 export async function isLoggedIn(c: Context) {
-    const session = await auth.api.getSession(c.req.raw);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return !!session;
 }
 
@@ -78,7 +78,7 @@ export async function isLoggedIn(c: Context) {
  * @param c
  */
 export async function getCurrentSession(c: Context) {
-    const session = await auth.api.getSession(c.req.raw);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) {
         throw new Error("Not logged in");
     }

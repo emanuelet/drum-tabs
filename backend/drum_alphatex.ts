@@ -1,5 +1,5 @@
-// @ts-types="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.d.ts"
-import { exporter, importer, Settings } from "@coderline/alphatab";
+// @deno-types="npm:@coderline/alphatab@1.8.4"
+import { exporter, importer, Settings } from "@coderline/alphatab-core";
 import { DrumHit, DrumInstrument, ParsedDrumTab } from "./drum_types.ts";
 
 const articulations: Record<DrumInstrument, string> = {

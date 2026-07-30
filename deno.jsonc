@@ -1,6 +1,15 @@
 {
     "version": "1.6.2",
 
+    "workspace": ["./frontend"],
+
+    "catalog": {
+        "@types/node": "^26.1.1",
+        "better-auth": "^1.6.25",
+        "typescript": "~5.9.3",
+        "zod": "^4.4.3"
+    },
+
     "nodeModulesDir": "auto",
 
     "unstable": [
@@ -34,10 +43,7 @@
         "cloud-deploy-dry-run": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run npm:wrangler deploy --dry-run"
     },
 
-    "lock": false,
-
     "exclude": [
-        "frontend",
         "extra",
         "dist"
     ],
@@ -66,16 +72,17 @@
     "imports": {
         "@hono/hono": "jsr:@hono/hono@~4.9.12",
         "@hono/node-server": "npm:@hono/node-server@~1.19.9",
-        "@coderline/alphatab": "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.core.mjs",
+        "@coderline/alphatab-core": "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.core.mjs",
         "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@~1.29.0",
         "@std/dotenv": "jsr:@std/dotenv@~0.225.6",
         "@std/fs": "jsr:@std/fs@~1.0.23",
         "@std/jsonc": "jsr:@std/jsonc@~1.0.2",
         "@std/path": "jsr:@std/path@~1.1.4",
         "@types/sanitize-filename": "npm:@types/sanitize-filename@~1.6.3",
-        "better-auth": "npm:better-auth@~1.3.34",
+        "better-auth": "catalog:",
         "cheerio": "npm:cheerio@~1.2.0",
         "sanitize-filename": "npm:sanitize-filename@~1.6.4",
-        "zod": "npm:zod@~4.4.3"
-    }
+        "zod": "catalog:"
+    },
+    "allowScripts": ["npm:esbuild@0.28.1", "npm:workerd@1.20260722.1"]
 }

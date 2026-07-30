@@ -8,10 +8,10 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "better-auth": "~1.4.17",
+        "better-auth": "catalog:",
         "private-ip": "~3.0.2",
         "rollup-plugin-visualizer": "^6.0.3",
-        "zod": "~4.1.11"
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@coderline/alphatab-vite": "1.8.4",
@@ -21,11 +21,11 @@
         "@fortawesome/vue-fontawesome": "3.3.3",
         "@jaxtheprime/vue3-dropzone": "~3.4.0",
         "@kyvg/vue3-notification": "~3.4.1",
-        "@types/node": "^24.5.2",
+        "@types/node": "catalog:",
         "@vitejs/plugin-vue": "~6.0.8",
         "@vue/tsconfig": "~0.8.1",
         "sass-embedded": "1.100.0",
-        "typescript": "~5.8.3",
+        "typescript": "catalog:",
         "vite": "~8.1.5",
         "@coderline/alphatab": "1.8.4",
         "vue": "~3.5.21",
