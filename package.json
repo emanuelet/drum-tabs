@@ -4,8 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "deno task build-frontend",
-        "dev:cloud": "wrangler dev",
-        "deploy:cloud": "npm run build && wrangler deploy",
+        "dev:cloud": "wrangler --config wrangler.local.jsonc dev",
+        "deploy:cloud": "npm run build && wrangler --config wrangler.local.jsonc deploy",
         "test:cloud": "vitest run cloud",
         "typecheck:cloud": "tsc --project cloud/tsconfig.json --noEmit"
     },

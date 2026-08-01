@@ -6,3 +6,4 @@ node_modules
 /private/
 /*.exe
 .env
+wrangler.local.jsonc

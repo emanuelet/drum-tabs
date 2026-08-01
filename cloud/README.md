@@ -10,12 +10,16 @@ npx wrangler d1 create drum-tabs
 npx wrangler r2 bucket create drum-tabs
 ```
 
-Copy the returned D1 id into `wrangler.jsonc`, set `APP_ORIGIN`, then set the production secret:
+Copy the configuration template, set the returned D1 id and `APP_ORIGIN` in the ignored local configuration, then set the production secret:
 
 ```bash
-npx wrangler secret put AUTH_SECRET
-npx wrangler d1 migrations apply drum-tabs --remote
-npx wrangler r2 bucket lifecycle set drum-tabs --file cloud/r2-lifecycle.json
+cp wrangler.example.jsonc wrangler.local.jsonc
+```
+
+```bash
+npx wrangler --config wrangler.local.jsonc secret put AUTH_SECRET
+npx wrangler --config wrangler.local.jsonc d1 migrations apply drum-tabs --remote
+npx wrangler --config wrangler.local.jsonc r2 bucket lifecycle set drum-tabs --file cloud/r2-lifecycle.json
 ```
 
 The lifecycle rule removes soft-deleted R2 objects after 30 days. The daily Worker cron removes the corresponding D1 metadata.
@@ -37,7 +41,7 @@ The frontend build requires Deno because its Vite configuration uses JSR imports
 
 ```bash
 deno task build-frontend
-npx wrangler deploy
+npx wrangler --config wrangler.local.jsonc deploy
 ```
 
-Run `npx wrangler deploy --dry-run` after the frontend build to validate the Worker bundle without deploying it.
+Run `npx wrangler --config wrangler.local.jsonc deploy --dry-run` after the frontend build to validate the Worker bundle without deploying it.

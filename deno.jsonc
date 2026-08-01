@@ -40,7 +40,7 @@
         "mcp": "deno run --allow-env=DATA_DIR,MYTABS_DEMO_MODE,MYTABS_HOST,MYTABS_PORT --allow-read --allow-write backend/mcp.ts",
         "cloud-typecheck": "deno check --node-modules-dir=auto cloud/worker.ts",
         "cloud-test": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run --allow-sys npm:vitest run cloud",
-        "cloud-deploy-dry-run": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run npm:wrangler deploy --dry-run"
+        "cloud-deploy-dry-run": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-run npm:wrangler --config wrangler.local.jsonc deploy --dry-run"
     },
 
     "exclude": [

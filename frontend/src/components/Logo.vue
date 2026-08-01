@@ -11,13 +11,14 @@ export default {
 
 <template>
     <router-link
+        aria-label="Drum Tabs home"
         :class='{
             "navbar-brand": true,
             "inline": inline,
         }'
         to="/"
     >
-        <img src="/icon.png" alt="Drum Tabs" />
+        <img src="/icon.svg" alt="Drum Tabs" />
     </router-link>
 </template>
 

@@ -17,7 +17,7 @@ const hideFooter = computed(() => route.meta?.hideFooter);
         <footer v-if="!hideFooter" class="my-5">
             Drum Tabs
             <span class="version me-3">{{ version }}</span>
-            <a href="https://github.com/louislam/its-mytabs" target="_blank">GitHub</a>
+            <a href="https://github.com/louislam/its-mytabs" target="_blank" rel="noreferrer">Forked from louislam/its-mytabs</a>
         </footer>
 
         <notifications position="bottom right" />

@@ -1,5 +1,5 @@
 <div align="center" width="100%">
-    <img src="./frontend/public/icon.png" width="128" alt="Drum Tabs" />
+    <img src="./frontend/public/icon.svg" width="128" alt="Drum Tabs" />
 </div>
 
 # Drum Tabs
@@ -8,6 +8,10 @@
 <a target="_blank" href="https://github.com/emanuelet/drum-tabs"><img src="https://img.shields.io/github/last-commit/emanuelet/drum-tabs" /></a>
 
 Drum Tabs is an open source, web based, self-hostable guitar, bass, and drum tab viewer and player, similar to Songsterr.
+
+## Attribution
+
+Drum Tabs is a drum-focused fork of [It's MyTabs](https://github.com/louislam/its-mytabs) by [Louis Lam](https://github.com/louislam).
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/d7859f4a-8ae0-41e2-bdeb-93b900cc0220" />
 <img width="200"  alt="image" src="https://github.com/user-attachments/assets/c980d516-8f6d-4cca-8a59-4a1a4cc75b1b" />

@@ -1,32 +1,8 @@
-<svg width="512" height="512" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color: #6b71f2; stop-opacity: 1" />
-            <stop offset="100%" style="stop-color: #3b3bb1; stop-opacity: 1" />
-        </linearGradient>
-    </defs>
-
-    <rect width="512" height="512" fill="url(#bgGradient)" />
-
-    <text
-        x="50%"
-        y="225"
-        text-anchor="middle"
-        fill="white"
-        font-family="Segoe UI"
-        font-weight="700"
-        font-size="100"
-        style="letter-spacing: -2px"
-    >It's</text>
-
-    <text
-        x="50%"
-        y="340"
-        text-anchor="middle"
-        fill="white"
-        font-family="Segoe UI"
-        font-weight="700"
-        font-size="100"
-        style="letter-spacing: -3px"
-    >MyTabs</text>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="112" fill="#1c2024" />
+    <path d="M130 150h86M296 150h86M173 150l-26-51M339 150l26-51" stroke="#b0c5d5" stroke-linecap="round" stroke-width="20" />
+    <path d="M100 92l118 118M412 92L294 210" stroke="#7c83ff" stroke-linecap="round" stroke-width="24" />
+    <circle cx="256" cy="314" r="118" fill="#3131c6" stroke="#b0c5d5" stroke-width="18" />
+    <circle cx="256" cy="314" r="68" fill="#1c2024" stroke="#7c83ff" stroke-width="14" />
+    <path d="M171 437l-22 38M341 437l22 38" stroke="#b0c5d5" stroke-linecap="round" stroke-width="18" />
 </svg>
