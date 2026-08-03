@@ -29,6 +29,7 @@ import {
     searchUltimateGuitar,
     UltimateGuitarError,
 } from "../backend/ultimate-guitar.ts";
+import { audioContentTypes, extension, safeFilename, sourceFormats } from "../shared/api/file-rules.ts";
 
 export { registrationBody } from "../shared/api/identity-routes.ts";
 
@@ -47,20 +48,6 @@ type TabRow = {
     deleted_at: string | null;
 };
 
-const sourceFormats = new Set([
-    "gp",
-    "gpx",
-    "gp3",
-    "gp4",
-    "gp5",
-    "musicxml",
-    "capx",
-    "txt",
-]);
-const audioFormats = new Map([
-    ["mp3", "audio/mpeg"],
-    ["ogg", "audio/ogg"],
-]);
 const syncSchema = z.object({
     syncMethod: z.enum(["simple", "advanced"]),
     simpleSync: z.number(),
@@ -74,22 +61,7 @@ function error(message: string, status = 400) {
     );
 }
 
-function extension(filename: string) {
-    const value = filename.split(".").pop()?.toLowerCase();
-    if (!value) throw new Error("File has no extension");
-    return value;
-}
-
-export function safeFilename(filename: string) {
-    if (
-        !filename ||
-        filename.includes("/") ||
-        filename.includes("\\") ||
-        filename.includes("..")
-    )
-        throw new Error("Invalid filename");
-    return filename.replace(/[^A-Za-z0-9._ -]/g, "_");
-}
+export { safeFilename } from "../shared/api/file-rules.ts";
 
 export function tabValue(row: TabRow) {
     return {
@@ -812,7 +784,7 @@ app.post("/api/tab/:id/audio", async (c) => {
         const file = (await c.req.formData()).get("file");
         if (!(file instanceof File)) throw new Error("No file uploaded");
         const filename = safeFilename(file.name);
-        const contentType = audioFormats.get(extension(filename));
+        const contentType = audioContentTypes.get(extension(filename));
         if (!contentType) throw new Error("Unsupported audio format");
         const key = `tabs/${tab.id}/audio/${filename}`;
         const existing = await c.env.DB.prepare(
