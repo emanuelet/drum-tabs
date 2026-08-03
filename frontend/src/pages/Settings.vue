@@ -225,17 +225,6 @@ export default defineComponent({
 
         <p class="text-secondary">Tips: If you want to check if the sync points is correct, "Cursor (Instant)" is a good indicator.</p>
 
-        <h2 class="mt-5 mb-4">Tab List</h2>
-
-        <!-- Group by artist -->
-        <div class="mb-3">
-            <label for="groupByArtist" class="form-label">Group tabs by Artist</label>
-            <select id="groupByArtist" class="form-select" v-model="setting.groupByArtist">
-                <option :value="false">No</option>
-                <option :value="true">Yes</option>
-            </select>
-        </div>
-
         <h2 class="mt-5 mb-4">Ultimate Guitar</h2>
 
         <div class="mb-3">

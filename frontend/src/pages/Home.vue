@@ -4,6 +4,7 @@ import { notify } from "@kyvg/vue3-notification";
 import { baseURL, getSetting } from "../app.js";
 import { isLoggedIn } from "../auth-client.js";
 import TabItem from "../components/TabItem.vue";
+import { SettingSchema } from "../zod.ts";
 
 export default defineComponent({
     components: {
@@ -105,6 +106,12 @@ export default defineComponent({
             this.tabList = [...this.tabList];
         },
 
+        persistSetting() {
+            const setting = SettingSchema.parse(this.setting);
+            this.setting = setting;
+            localStorage.setItem("userSetting", JSON.stringify(setting));
+        },
+
         async deleteTab(id, title, artist) {
             if (!confirm(`Are you sure you want to delete ${artist} - ${title}?`)) return;
 
@@ -179,11 +186,18 @@ export default defineComponent({
             </div>
         </div>
 
-        <div class="mb-4 ms-3" v-if="ready">
-            Total Tabs: {{ filteredTabList.length }}
-            <span v-if="searchQuery" class="text-muted">
-                (of {{ tabList.length }})
-            </span>
+        <div class="tab-list-controls mb-4 ms-3 me-3" v-if="ready">
+            <div>
+                Total Tabs: {{ filteredTabList.length }}
+                <span v-if="searchQuery" class="text-muted">
+                    (of {{ tabList.length }})
+                </span>
+            </div>
+
+            <div class="form-check form-switch mb-0">
+                <input id="groupByArtist" v-model="setting.groupByArtist" class="form-check-input" type="checkbox" role="switch" @change="persistSetting" />
+                <label class="form-check-label" for="groupByArtist">Group by artist</label>
+            </div>
         </div>
 
         <template v-if="this.setting.groupByArtist && groupedTabs">
@@ -241,5 +255,12 @@ export default defineComponent({
 
 h4 {
     color: $color2-dark;
+}
+
+.tab-list-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
 }
 </style>

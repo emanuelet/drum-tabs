@@ -50,8 +50,9 @@ export default defineComponent({
     <div class="form-container" data-cy="setup-form">
         <div class="form">
             <form @submit.prevent="submit">
-                <div style="font-size: 28px; font-weight: bold" class="mb-5 mt-5">
-                    Drum Tabs
+                <div class="brand mb-5 mt-4">
+                    <Logo inline />
+                    <div>Drum Tabs</div>
                 </div>
 
                 <div class="form-floating mt-3">
@@ -101,5 +102,15 @@ export default defineComponent({
     padding: 15px;
     margin: auto;
     text-align: center;
+}
+
+.brand {
+    font-size: 28px;
+    font-weight: bold;
+
+    :deep(.navbar-brand) {
+        display: block;
+        margin: 0 auto 12px;
+    }
 }
 </style>

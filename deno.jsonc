@@ -73,7 +73,7 @@
         "@hono/hono": "jsr:@hono/hono@~4.9.12",
         "@hono/node-server": "npm:@hono/node-server@~1.19.9",
         "@coderline/alphatab-core": "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.core.mjs",
-        "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@~1.29.0",
+        "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@~1.30.0",
         "@std/dotenv": "jsr:@std/dotenv@~0.225.6",
         "@std/fs": "jsr:@std/fs@~1.0.23",
         "@std/jsonc": "jsr:@std/jsonc@~1.0.2",

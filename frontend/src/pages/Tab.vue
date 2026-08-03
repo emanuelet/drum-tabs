@@ -409,7 +409,6 @@ export default defineComponent({
             window.removeEventListener("click", this._onDocumentClick);
             this._onDocumentClick = undefined;
         }
-
     },
     methods: {
         adjustBpm(amount) {
@@ -1479,6 +1478,7 @@ export default defineComponent({
             <div class="scroll">
                 <div class="track-selector selector" ref="trackSelector">
                     <button class="button" type="button" @click='showList("track")' :aria-expanded="showTrackList">
+                        <font-awesome-icon :icon='["fas", "music"]' />
                         <span v-if="tracks.length > 0">Tracks: {{ tracks[selectedTrack].name }}</span>
                         <span v-else>Loading...</span>
                         <font-awesome-icon :icon='["fas", "caret-down"]' />
@@ -1517,6 +1517,7 @@ export default defineComponent({
 
                 <div class="audio-selector selector" ref="audioSelector">
                     <button class="button" type="button" @click='showList("audio")' :aria-expanded="showAudioList">
+                        <font-awesome-icon :icon='["fas", "volume-high"]' />
                         {{ audioSelectionLabel }}
                         <font-awesome-icon :icon='["fas", "caret-down"]' />
                     </button>
@@ -1539,19 +1540,23 @@ export default defineComponent({
                 </button>
                 <button class="btn btn-secondary" @click="loop()" :class="{ active: isLooping }">
                     <font-awesome-icon :icon='["fas", "check"]' v-if="isLooping" />
+                    <font-awesome-icon :icon='["fas", "repeat"]' v-else />
                     Loop
                 </button>
                 <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn, disabled: currentAudio !== "synth" }'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableCountIn" />
+                    <font-awesome-icon :icon='["fas", "list-ol"]' v-else />
                     Count in
                 </button>
                 <button class="btn btn-secondary" @click="metronome()" :class='{ active: enableMetronome, disabled: currentAudio !== "synth" }'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableMetronome" />
+                    <font-awesome-icon :icon='["fas", "stopwatch"]' v-else />
                     Metronome
                 </button>
 
                 <div class="speed-selector">
                     <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
+                        <font-awesome-icon :icon='["fas", "gauge-high"]' />
                         Speed: {{ bpm }} BPM
                     </button>
                     <div class="speed-selector-popover" v-if="showSpeedSelector">
@@ -1576,16 +1581,17 @@ export default defineComponent({
 
                 <div class="zoom-selector">
                     <button class="btn btn-secondary" type="button" aria-label="Zoom out" :disabled="tabScale <= 0.5" @click="adjustTabScale(-0.1)">
-                        −
+                        <font-awesome-icon :icon='["fas", "magnifying-glass-minus"]' />
                     </button>
                     <span>Zoom {{ Math.round(tabScale * 100) }}%</span>
                     <button class="btn btn-secondary" type="button" aria-label="Zoom in" :disabled="tabScale >= 3" @click="adjustTabScale(0.1)">
-                        +
+                        <font-awesome-icon :icon='["fas", "magnifying-glass-plus"]' />
                     </button>
                 </div>
 
                 <div class="btn-edit" v-if="isLoggedIn">
                     <button class="btn btn-secondary" @click="edit()">
+                        <font-awesome-icon :icon='["fas", "pen"]' />
                         Edit
                     </button>
                 </div>
@@ -1723,6 +1729,7 @@ $youtube-height: 200px;
 
         .btn-edit {
             flex-grow: 1;
+            order: 2;
             text-align: right;
         }
 
@@ -1893,6 +1900,7 @@ $padding: 20px;
 
 .drum-notation-selector {
     position: relative;
+    order: 1;
 }
 
 .drum-notation-tooltip {
