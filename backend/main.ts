@@ -1,17 +1,9 @@
 import { serve, ServerType } from "@hono/node-server";
 import { Context, Hono } from "@hono/hono";
 import * as fs from "@std/fs";
-import { auth, checkLogin, getCurrentSession, getCurrentUser, isDisableSignUp, isFinishSetup, isLoggedIn, requireTeacher } from "./auth.ts";
+import { auth, checkLogin, getCurrentUser, isDisableSignUp, isFinishSetup } from "./auth.ts";
 import {
-    CreateAssignmentSchema,
-    CreateExerciseSchema,
-    PinSchema,
-    RegisterSchema,
     SyncRequestSchema,
-    UpdateExerciseFavSchema,
-    UpdateExerciseSchema,
-    UpdateTabFavSchema,
-    UpdateTabInfoSchema,
     YoutubeAddDataSchema,
 } from "./zod.ts";
 import { createExercise, deleteExercise, getAllExercises, updateExercise, updateExerciseFav } from "./exercise.ts";
@@ -22,6 +14,7 @@ import {
     deleteAssignment,
     disconnectStudent,
     getLearnerAssignments,
+    getUserRole,
     getStudents,
     getTeacherAssignments,
     isInitDB,
@@ -30,6 +23,14 @@ import {
     searchLearners,
     setUserRole,
 } from "./db.ts";
+import { type IdentityRouteApp, mountIdentityRoutes } from "../shared/api/identity-routes.ts";
+import { mountTeachingRoutes } from "../shared/api/teaching-routes.ts";
+import { mountExerciseRoutes } from "../shared/api/exercise-routes.ts";
+import { mountTabListRoutes } from "../shared/api/tab-list-routes.ts";
+import { mountSettingsRoutes } from "../shared/api/settings-routes.ts";
+import { mountTabDetailRoutes } from "../shared/api/tab-detail-routes.ts";
+import { mountTabMutationRoutes } from "../shared/api/tab-mutation-routes.ts";
+import type { ExerciseRouteDependencies, SettingsRouteDependencies, TabDetailRouteDependencies, TabListRouteDependencies, TabMutationRouteDependencies, TeachingRouteDependencies } from "../shared/api/ports.ts";
 import { cors } from "@hono/hono/cors";
 import { serveStatic } from "@hono/hono/deno";
 import { appVersion, checkFilename, dataDir, devOriginList, getFrontendDir, getSourceDir, host, isDemoMode, isDev, port, start, tabDir } from "./util.ts";
@@ -153,126 +154,73 @@ export async function main() {
         );
     }
 
-    // The custom registration route below is the only way to select an app role.
-    app.post("/api/auth/sign-up/email", (c) => c.json({ error: "Use /api/register" }, 404));
-    app.post("/api/auth/sign-in/email", async (c) => {
-        try {
-            const body = await c.req.raw.clone().json() as { password?: unknown };
-            PinSchema.parse(body.password);
-            return auth.handler(c.req.raw);
-        } catch (e) {
-            return generalError(c, e);
-        }
+    const sharedDependencies = (): TeachingRouteDependencies & ExerciseRouteDependencies & TabListRouteDependencies & SettingsRouteDependencies & TabDetailRouteDependencies & TabMutationRouteDependencies => ({
+        auth: {
+            handle: (request) => auth.handler(request),
+            getSession: (request) => auth.api.getSession({ headers: request.headers }),
+            signUpEmail: ({ email, name, password }) => auth.api.signUpEmail({ body: { email, name, password } }),
+            isSignUpDisabled: isDisableSignUp,
+            isSetupComplete: async () => isFinishSetup(),
+        },
+        identity: {
+            getRole: async (userId) => getUserRole(userId),
+            setRole: async (userId, role) => setUserRole(userId, role),
+        },
+        teaching: {
+            searchLearners: async (query) => searchLearners(query),
+            listStudents: async (teacherId) => ({ students: getStudents(teacherId), assignments: getTeacherAssignments(teacherId) }),
+            connectStudent: async (teacherId, learnerId) => connectStudent(teacherId, learnerId),
+            disconnectStudent: async (teacherId, learnerId) => disconnectStudent(teacherId, learnerId),
+            createAssignment: async (teacherId, learnerId, resourceType, resourceId) => createAssignment(teacherId, learnerId, resourceType, resourceId),
+            deleteAssignment: async (teacherId, assignmentId) => deleteAssignment(teacherId, assignmentId),
+            listAssignments: async (userId, role) => role === "teacher" ? getTeacherAssignments(userId) : getLearnerAssignments(userId),
+        },
+        resources: {
+            hasExercise: async (id) => (await getAllExercises()).some((exercise) => exercise.id === id),
+            hasTab: async (id) => {
+                try {
+                    await checkTabExists(id);
+                    return true;
+                } catch {
+                    return false;
+                }
+            },
+        },
+        exercises: {
+            list: getAllExercises,
+            create: async (input) => await createExercise(input.alphaTex),
+            update: async (id, input) => await updateExercise(id, input.alphaTex),
+            setFavorite: updateExerciseFav,
+            delete: deleteExercise,
+        },
+        tabs: { list: getAllTabs },
+        settings: {
+            get: async (userId) => (await kv.get(["user_setting", userId])).value,
+            set: async (userId, value) => { await kv.set(["user_setting", userId], value); },
+        },
+        tabDetail: {
+            showOpenButtons: Deno.build.standalone && Deno.build.os === "windows",
+            get: async (id) => {
+                const config = await getConfigJSON(id);
+                if (!config) throw new Error("Config.json not found");
+                const fixed = await fixMissingTab(config);
+                return { tab: fixed.tab, audioList: fixed.audio, youtubeList: fixed.youtube };
+            },
+            getLocalPath: async (id) => getTabFullFilePath(await getTab(id)),
+        },
+        tabMutations: {
+            update: async (id, input) => await updateTab(await getTab(id), input),
+            setFavorite: async (id, fav) => await updateTabFav(await getTab(id), { fav }),
+        },
     });
 
-    // Better-Auth routes
-    app.all("/api/auth/*", (c) => {
-        return auth.handler(c.req.raw);
-    });
-
-    // Is Disable Sign Up
-    app.get("/api/is-finish-setup", (c) => {
-        return c.json(isFinishSetup());
-    });
-
-    app.post("/api/register", async (c) => {
-        try {
-            if (isDisableSignUp()) return c.json({ error: "Sign up is disabled" }, 403);
-            const body = RegisterSchema.parse(await c.req.json());
-
-            const data = await auth.api.signUpEmail({
-                body: { email: body.email, name: body.name, password: body.pin },
-            });
-            setUserRole(data.user.id, body.role);
-
-            return c.json(data);
-        } catch (e) {
-            if (e instanceof Error) {
-                return c.json({ error: e.message }, 400);
-            } else {
-                return c.json({ error: "Unknown error" }, 400);
-            }
-        }
-    });
-
-    app.get("/api/me", async (c) => {
-        try {
-            return c.json({ ok: true, user: await getCurrentUser(c) });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.get("/api/learners", async (c) => {
-        try {
-            await requireTeacher(c);
-            return c.json({ ok: true, learners: searchLearners(c.req.query("query") || "") });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.get("/api/students", async (c) => {
-        try {
-            const teacher = await requireTeacher(c);
-            return c.json({ ok: true, students: getStudents(teacher.id), assignments: getTeacherAssignments(teacher.id) });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/students/:learnerId", async (c) => {
-        try {
-            const teacher = await requireTeacher(c);
-            connectStudent(teacher.id, c.req.param("learnerId"));
-            return c.json({ ok: true });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.delete("/api/students/:learnerId", async (c) => {
-        try {
-            const teacher = await requireTeacher(c);
-            disconnectStudent(teacher.id, c.req.param("learnerId"));
-            return c.json({ ok: true });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/assignments", async (c) => {
-        try {
-            const teacher = await requireTeacher(c);
-            const data = CreateAssignmentSchema.parse(await c.req.json());
-            if (data.resourceType === "exercise" && !(await getAllExercises()).some((exercise) => exercise.id === data.resourceId)) throw new Error("Exercise not found");
-            if (data.resourceType === "tab") await checkTabExists(data.resourceId);
-            const id = createAssignment(teacher.id, data.learnerId, data.resourceType, data.resourceId);
-            return c.json({ ok: true, id });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.delete("/api/assignments/:id", async (c) => {
-        try {
-            const teacher = await requireTeacher(c);
-            deleteAssignment(teacher.id, c.req.param("id"));
-            return c.json({ ok: true });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.get("/api/assignments", async (c) => {
-        try {
-            const user = await getCurrentUser(c);
-            const assignments = user.role === "teacher" ? getTeacherAssignments(user.id) : getLearnerAssignments(user.id);
-            return c.json({ ok: true, assignments });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
+    mountIdentityRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountTeachingRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountExerciseRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountTabListRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountSettingsRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountTabDetailRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
+    mountTabMutationRoutes(app as unknown as IdentityRouteApp, sharedDependencies);
 
     // New Tab
     app.post("/api/new-tab", async (c) => {
@@ -356,55 +304,6 @@ export async function main() {
                 originalFilename,
             );
             return c.json({ ok: true, id, warnings: parsed.warnings });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.get("/api/exercises", async (c) => {
-        try {
-            await checkLogin(c);
-            return c.json({ ok: true, exercises: await getAllExercises() });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/exercises", async (c) => {
-        try {
-            await checkLogin(c);
-            const { alphaTex } = CreateExerciseSchema.parse(await c.req.json());
-            return c.json({ ok: true, exercise: await createExercise(alphaTex) });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/exercises/:id/fav", async (c) => {
-        try {
-            await checkLogin(c);
-            const { fav } = UpdateExerciseFavSchema.parse(await c.req.json());
-            return c.json({ ok: true, exercise: await updateExerciseFav(c.req.param("id"), fav) });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/exercises/:id", async (c) => {
-        try {
-            await checkLogin(c);
-            const { alphaTex } = UpdateExerciseSchema.parse(await c.req.json());
-            return c.json({ ok: true, exercise: await updateExercise(c.req.param("id"), alphaTex) });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.delete("/api/exercises/:id", async (c) => {
-        try {
-            await checkLogin(c);
-            await deleteExercise(c.req.param("id"));
-            return c.json({ ok: true });
         } catch (e) {
             return generalError(c, e);
         }
@@ -500,93 +399,6 @@ export async function main() {
             });
 
             return c.json({ ok: true, id });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    // Get Tab List
-    app.get("/api/tabs", async (c) => {
-        try {
-            const user = await getCurrentUser(c);
-
-            const tabList = await getAllTabs();
-            const assignments = user.role === "learner" ? getLearnerAssignments(user.id).filter((assignment) => assignment.resourceType === "tab") : [];
-            const assignmentsByTab = new Map(assignments.map((assignment) => [assignment.resourceId, assignment]));
-
-            return c.json({
-                ok: true,
-                tabs: tabList.map((tab) => ({ ...tab, teacherAssignment: assignmentsByTab.get(tab.id) || null })),
-            });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    // Get Tab
-    app.get("/api/tab/:id", async (c) => {
-        try {
-            const id = c.req.param("id");
-
-            let config = await getConfigJSON(id);
-            if (!config) {
-                throw new Error("Config.json not found");
-            }
-
-            if (!config.tab.public) {
-                await checkLogin(c);
-            }
-
-            config = await fixMissingTab(config);
-
-            const filePath = (await isLoggedIn(c)) ? getTabFullFilePath(config.tab) : "";
-
-            return c.json({
-                ok: true,
-                showOpenButtons: Deno.build.standalone && Deno.build.os === "windows",
-                tab: config.tab,
-                youtubeList: config.youtube,
-                audioList: config.audio,
-                filePath,
-            });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    // Edit Tab
-    app.post("/api/tab/:id", async (c) => {
-        try {
-            await checkLogin(c);
-            const id = c.req.param("id");
-
-            const body = await c.req.json();
-            const data = UpdateTabInfoSchema.parse(body);
-
-            const tab = await getTab(id);
-            await updateTab(tab, data);
-            return c.json({
-                ok: true,
-            });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    // Update Tab Favorite Status
-    app.post("/api/tab/:id/fav", async (c) => {
-        try {
-            await checkLogin(c);
-            const id = c.req.param("id");
-
-            const body = await c.req.json();
-            const data = UpdateTabFavSchema.parse(body);
-
-            const tab = await getTab(id);
-            await updateTabFav(tab, data);
-            return c.json({
-                ok: true,
-            });
         } catch (e) {
             return generalError(c, e);
         }
@@ -935,34 +747,6 @@ export async function main() {
                 ok: true,
                 token,
             });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.get("/api/settings", async (c) => {
-        try {
-            const session = await getCurrentSession(c);
-            const entry = await kv.get(["user_setting", session.user.id]);
-            const setting = entry.value;
-            if (!setting) {
-                throw new Error("Settings not found on server");
-            }
-            return c.json({
-                ok: true,
-                setting,
-            });
-        } catch (e) {
-            return generalError(c, e);
-        }
-    });
-
-    app.post("/api/settings", async (c) => {
-        try {
-            const session = await getCurrentSession(c);
-            const body = await c.req.json();
-            await kv.set(["user_setting", session.user.id], body);
-            return c.json({ ok: true });
         } catch (e) {
             return generalError(c, e);
         }
