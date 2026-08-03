@@ -1465,7 +1465,32 @@ export default defineComponent({
     <TextTabPlayer v-if="isTextTab" :id="String(tabID)" />
     <div v-else class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
         <h1>{{ tab.title }}</h1>
-        <h2>{{ tab.artist }}</h2>
+        <div class="artist-row">
+            <h2>{{ tab.artist }}</h2>
+            <div class="drum-notation-selector" v-if="isDrum()">
+                <button class="btn btn-outline-secondary" type="button" @click="showDrumNotation = !showDrumNotation" :aria-expanded="showDrumNotation">
+                    <font-awesome-icon :icon='["fas", "drum"]' />
+                    Notation
+                </button>
+                <div class="drum-notation-tooltip" v-if="showDrumNotation">
+                    <strong class="drum-notation-title">DRUMSET</strong>
+                    <div class="drum-notation-groups">
+                        <div
+                            class="drum-notation-group bass"><span>Bass drum</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 38c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg></div>
+                        <div
+                            class="drum-notation-group snare"><span>Snare</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 26c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg></div>
+                        <div
+                            class="drum-notation-group hihat"><span>Hi Hat</span><small>Closed</small><small>Open</small><small>Foot</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 1-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg><svg viewBox="0 0 28 60"><circle class="drum-glyph" cx="14" cy="1" r="6" /><path class="drum-glyph" d="m10-3 8 8m0-8-8 8" /></svg><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 55-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg></div>
+                        <div
+                            class="drum-notation-group tom"><span>Tom</span><small>Floor</small><small>Very low</small><small>High</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 8c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg></div>
+                        <div
+                            class="drum-notation-group crash"><span>Crash</span><small>High</small><svg viewBox="0 0 28 60"><path class="drum-ledger" d="M6-11h16" /><path class="drum-glyph" d="m14-11-5-4 2-2 4 4 4-4 2 2-5 4 5 4-2 2-4-4-4 4-2-2z" /></svg></div>
+                        <div
+                            class="drum-notation-group ride"><span>Ride</span><small>Cymbal</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 7-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature">
             {{ keySignature }}
         </div>
@@ -1483,36 +1508,6 @@ export default defineComponent({
                         <span v-else>Loading...</span>
                         <font-awesome-icon :icon='["fas", "caret-down"]' />
                     </button>
-                </div>
-
-                <div class="drum-notation-selector" v-if="isDrum()">
-                    <button class="btn btn-secondary" type="button" @click="showDrumNotation = !showDrumNotation" :aria-expanded="showDrumNotation">
-                        <font-awesome-icon :icon='["fas", "drum"]' />
-                        Notation
-                    </button>
-                    <div class="drum-notation-tooltip" v-if="showDrumNotation">
-                        <strong class="drum-notation-title">DRUMSET</strong>
-                        <div class="drum-notation-groups">
-                            <div class="drum-notation-group bass">
-                                <span>Bass drum</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 38c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
-                            </div>
-                            <div class="drum-notation-group snare">
-                                <span>Snare</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 26c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
-                            </div>
-                            <div class="drum-notation-group hihat">
-                                <span>Hi Hat</span><small>Closed</small><small>Open</small><small>Foot</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 1-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg><svg viewBox="0 0 28 60"><circle class="drum-glyph" cx="14" cy="1" r="6" /><path class="drum-glyph" d="m10-3 8 8m0-8-8 8" /></svg><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 55-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg>
-                            </div>
-                            <div class="drum-notation-group tom">
-                                <span>Tom</span><small>Floor</small><small>Very low</small><small>High</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 32c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 8c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg>
-                            </div>
-                            <div class="drum-notation-group crash">
-                                <span>Crash</span><small>High</small><svg viewBox="0 0 28 60"><path class="drum-ledger" d="M6-11h16" /><path class="drum-glyph" d="m14-11-5-4 2-2 4 4 4-4 2 2-5 4 5 4-2 2-4-4-4 4-2-2z" /></svg>
-                            </div>
-                            <div class="drum-notation-group ride">
-                                <span>Ride</span><small>Cymbal</small><svg viewBox="0 0 28 60"><path class="drum-glyph" d="m14 7-4-4 1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1z" /></svg>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="audio-selector selector" ref="audioSelector">
@@ -1729,7 +1724,6 @@ $youtube-height: 200px;
 
         .btn-edit {
             flex-grow: 1;
-            order: 2;
             text-align: right;
         }
 
@@ -1794,6 +1788,26 @@ h1 {
     font-weight: 300;
     line-height: 45px;
     word-break: break-word;
+}
+
+.artist-row {
+    display: grid;
+    align-items: center;
+    grid-template-columns: 1fr auto 1fr;
+
+    h2 {
+        grid-column: 2;
+    }
+
+    .drum-notation-selector {
+        grid-column: 3;
+        justify-self: start;
+        margin-left: 12px;
+
+        > .btn {
+            border-radius: 999px;
+        }
+    }
 }
 
 h2 {
@@ -1900,13 +1914,12 @@ $padding: 20px;
 
 .drum-notation-selector {
     position: relative;
-    order: 1;
 }
 
 .drum-notation-tooltip {
     position: absolute;
-    bottom: calc(100% + 10px);
-    left: 0;
+    top: calc(100% + 10px);
+    right: 0;
     z-index: 2;
     width: min(650px, calc(100vw - 32px));
     padding: 14px 20px 20px;
@@ -2052,7 +2065,7 @@ $padding: 20px;
     position: relative;
 
     > .btn {
-        width: 160px;
+        width: 180px;
     }
 }
 
@@ -2257,6 +2270,7 @@ $padding: 20px;
     }
 
     .drum-notation-tooltip {
+        right: auto;
         left: 50%;
         transform: translateX(-50%);
     }

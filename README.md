@@ -54,10 +54,6 @@ Support: x64, ARM64
 
 Tip: Youtube videos may not work on a private ip address (e.g. 192.168.x.x), use `localhost` or a public ip/domain instead.
 
-### Windows (exe)
-
-Download the latest release (drumtabs-v1.x.x-windows.zip) from the [Releases](https://github.com/emanuelet/drum-tabs/releases/latest) page, unzip it, and run `drumtabs.exe`.
-
 ### Docker Compose
 
 Download the [compose.yaml]() file and put it in an empty folder.
@@ -126,7 +122,7 @@ Go to `http://localhost:47777` to access the web UI.
 
 Requirements:
 
-- [Deno](https://deno.land/) 2.9.3 or above
+- [Deno](https://deno.land/) 2.9.4 or above
 - Git
 
 ```bash
