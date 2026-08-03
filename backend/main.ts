@@ -60,7 +60,6 @@ import {
     updateYoutube,
 } from "./tab.ts";
 import { ZodError } from "zod";
-import sanitize from "sanitize-filename";
 import "@std/dotenv/load";
 import * as cheerio from "cheerio";
 import { downloadUltimateGuitarFile, getUltimateGuitarTab, searchUltimateGuitar, UltimateGuitarError } from "./ultimate-guitar.ts";
