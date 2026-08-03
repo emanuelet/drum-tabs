@@ -1,7 +1,7 @@
 {
-    "version": "1.6.2",
+    "version": "1.8.0",
 
-    "workspace": ["./frontend"],
+    "workspace": ["./frontend", "./cloud"],
 
     "catalog": {
         "@types/node": "^26.1.1",
