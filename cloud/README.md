@@ -20,7 +20,7 @@ cp ../wrangler.example.jsonc ../wrangler.local.jsonc
 ```bash
 npm exec -- wrangler --config ../wrangler.local.jsonc secret put AUTH_SECRET
 npm exec -- wrangler --config ../wrangler.local.jsonc d1 migrations apply drum-tabs --remote
-npm exec -- wrangler --config ../wrangler.local.jsonc r2 bucket lifecycle set drum-tabs --file r2-lifecycle.json
+npm exec -- wrangler --config ../wrangler.local.jsonc r2 bucket lifecycle add drum-tabs expire-soft-deleted-tabs deleted/ --expire-days 30 --force
 ```
 
 The lifecycle rule removes soft-deleted R2 objects after 30 days. The daily Worker cron removes the corresponding D1 metadata.
