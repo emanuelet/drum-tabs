@@ -17,21 +17,14 @@ const syncOffsetYoutubeActionBuffer = new ActionBuffer(200);
 const syncOffsetAudioActionBuffer = new ActionBuffer(200);
 
 export default defineComponent({
-    /**
-     * @type {alphaTab.AlphaTabApi}
-     */
-    api: null,
-
-    audioHandler: null,
-
-    alphaTabYoutubeHandler: null,
-
-    youtubePlayer: null,
-
     components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown, TextTabPlayer },
     emits: ["setFixedHeader"],
     data() {
         return {
+            api: null,
+            audioHandler: null,
+            alphaTabYoutubeHandler: null,
+            youtubePlayer: null,
             isLoggedIn: false,
             title: "",
             artist: "",
@@ -576,7 +569,7 @@ export default defineComponent({
 
             if (targetBar) {
                 const firstBeat = targetBar.voices[0].beats[0];
-                api.tickPosition = firstBeat.absoluteDisplayStart;
+                this.api.tickPosition = firstBeat.absoluteDisplayStart;
             }
 
             this.play();
@@ -614,6 +607,8 @@ export default defineComponent({
                 if (!(this.$refs.bassTabContainer instanceof HTMLElement)) {
                     reject(new Error("Container element not found"));
                 }
+
+                trackID = Number.isInteger(trackID) && trackID >= 0 ? trackID : 0;
 
                 let displayResources = {
                     tablatureFont: "bold 14px Arial",
@@ -656,7 +651,9 @@ export default defineComponent({
                     },
                     core: {
                         file: this.getFileURL(tempToken),
-                        //tracks: [trackID],
+                        // Deno's Vite dev server does not provide a MIME type for alphaTab's module worker.
+                        useWorkers: !import.meta.env.DEV,
+                        tracks: [trackID],
                         fontDirectory: "/font/",
                         engine: "html5",
                     },
@@ -708,11 +705,10 @@ export default defineComponent({
                     if (trackID < 0 || trackID >= score.tracks.length) {
                         trackID = 0;
                     }
-                    this.api.renderTracks([this.api.score.tracks[trackID]]);
 
                     // Always show tempo automation on the master bar
-                    if (api.score.masterBars.length > 0 && api.score.masterBars[0].tempoAutomations.length > 0) {
-                        api.score.masterBars[0].tempoAutomations[0].isVisible = true;
+                    if (this.api.score.masterBars.length > 0 && this.api.score.masterBars[0].tempoAutomations.length > 0) {
+                        this.api.score.masterBars[0].tempoAutomations[0].isVisible = true;
                     }
 
                     // Get key signature

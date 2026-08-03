@@ -51,5 +51,9 @@ export default defineConfig({
 
     server: {
         host: "0.0.0.0",
+        fs: {
+            // Deno stores npm packages in the repository-level node_modules cache.
+            allow: [".."],
+        },
     },
 });
