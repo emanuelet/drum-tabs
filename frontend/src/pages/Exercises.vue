@@ -284,59 +284,63 @@ export default defineComponent({
             <h1>Drum exercises</h1>
             <p>Practice patterns stored separately from your tab library.</p>
         </header>
-        <section class="player" :class="{ light: setting.scoreColor === 'light' }">
-            <div class="controls">
-                <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
-                <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
-                <label><input v-model="metronome" type="checkbox" /> Metronome</label>
-                <label><input v-model="looping" type="checkbox" /> Loop</label>
-                <label v-if="exerciseTracks.length > 1"
-                    class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
-            </div>
-            <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
-            <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
-        </section>
-        <section v-if="ready && favoriteExercises.length" class="favorites">
-            <div class="preset-heading">
-                <h2>Favorites</h2>
-            </div>
-            <div class="exercise-grid">
-                <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
-                    <button class="exercise-select"
-                        @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
-                    <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites" @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
-                </article>
-            </div>
-        </section>
-        <section v-if="ready" class="all-exercises">
-            <div class="preset-heading">
-                <h2>All exercises</h2>
-                <div class="exercise-actions">
-                    <div class="input-group search">
-                        <span class="input-group-text"><font-awesome-icon icon="magnifying-glass" /></span>
-                        <input v-model="searchQuery" class="form-control" type="search" placeholder="Search exercises" aria-label="Search exercises" />
-                        <button v-if="searchQuery" class="btn btn-outline-secondary" type="button" @click="searchQuery = ''">Clear</button>
+        <div class="exercise-layout">
+            <div class="exercise-library">
+                <section v-if="ready && favoriteExercises.length" class="favorites">
+                    <div class="preset-heading">
+                        <h2>Favorites</h2>
                     </div>
-                    <button class="btn btn-primary" type="button" @click="openAddDialog">Add exercise</button>
+                    <div class="exercise-grid">
+                        <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
+                            <button class="exercise-select"
+                                @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
+                            <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites" @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
+                        </article>
+                    </div>
+                </section>
+                <section v-if="ready" class="all-exercises">
+                    <div class="preset-heading">
+                        <h2>All exercises</h2>
+                        <div class="exercise-actions">
+                            <div class="input-group search">
+                                <span class="input-group-text"><font-awesome-icon icon="magnifying-glass" /></span>
+                                <input v-model="searchQuery" class="form-control" type="search" placeholder="Search exercises" aria-label="Search exercises" />
+                                <button v-if="searchQuery" class="btn btn-outline-secondary" type="button" @click="searchQuery = ''">Clear</button>
+                            </div>
+                            <button class="btn btn-primary" type="button" @click="openAddDialog">Add</button>
+                        </div>
+                    </div>
+                    <div class="exercise-list">
+                        <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected.id === exercise.id }">
+                            <button class="exercise-select" @click="selectExercise(exercise)">
+                                <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em>
+                            </button>
+                            <button class="star-button" type="button" :title="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
+                                :aria-label="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
+                                @click="toggleFav(exercise)"><font-awesome-icon :icon="exercise.fav ? 'star' : ['far', 'star']" /></button>
+                            <AssignButton v-if="user?.role === 'teacher'" outline resource-type="exercise" :resource-id="exercise.id" :resource-title="exercise.title" />
+                            <button class="btn btn-sm btn-outline-secondary icon-button" type="button" title="Edit exercise" aria-label="Edit exercise"
+                                @click="openEditDialog(exercise)"><font-awesome-icon icon="pen" /></button>
+                            <button class="btn btn-sm btn-outline-danger icon-button" type="button" title="Delete exercise" aria-label="Delete exercise"
+                                @click="deleteExercise(exercise)"><font-awesome-icon icon="trash-can" /></button>
+                        </article>
+                    </div>
+                    <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
+                </section>
+            </div>
+            <section class="player" :class="{ light: setting.scoreColor === 'light' }">
+                <div class="controls">
+                    <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
+                    <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
+                    <label><input v-model="metronome" type="checkbox" /> Metronome</label>
+                    <label><input v-model="looping" type="checkbox" /> Loop</label>
+                    <label v-if="exerciseTracks.length > 1"
+                        class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
                 </div>
-            </div>
-            <div class="exercise-list">
-                <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected.id === exercise.id }">
-                    <button class="exercise-select" @click="selectExercise(exercise)">
-                        <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em>
-                    </button>
-                    <button class="star-button" type="button" :title="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
-                        :aria-label="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
-                        @click="toggleFav(exercise)"><font-awesome-icon :icon="exercise.fav ? 'star' : ['far', 'star']" /></button>
-                    <AssignButton v-if="user?.role === 'teacher'" outline resource-type="exercise" :resource-id="exercise.id" :resource-title="exercise.title" />
-                    <button class="btn btn-sm btn-outline-secondary icon-button" type="button" title="Edit exercise" aria-label="Edit exercise"
-                        @click="openEditDialog(exercise)"><font-awesome-icon icon="pen" /></button>
-                    <button class="btn btn-sm btn-outline-danger icon-button" type="button" title="Delete exercise" aria-label="Delete exercise"
-                        @click="deleteExercise(exercise)"><font-awesome-icon icon="trash-can" /></button>
-                </article>
-            </div>
-            <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
-        </section>
+                <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
+                <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
+            </section>
+        </div>
         <dialog ref="addDialog" class="add-dialog">
             <form @submit.prevent="saveExercise">
                 <div
@@ -361,7 +365,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .exercises {
-    max-width: 1100px;
+    max-width: 1440px;
 }
 header {
     padding: 2rem 0 1rem;
@@ -374,7 +378,13 @@ header {
 }
 .favorites,
 .all-exercises {
-    margin-top: 24px;
+    margin-bottom: 24px;
+}
+.exercise-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 24px;
+    align-items: start;
 }
 .preset-heading {
     display: flex;
@@ -454,8 +464,9 @@ header {
 }
 .exercise-row span,
 .exercise-row small {
-    display: inline;
-    margin-left: 8px;
+    display: block;
+    margin-top: 4px;
+    margin-left: 0;
     opacity: .7;
 }
 .exercise-row em {
@@ -584,6 +595,11 @@ header {
 .dialog-actions {
     justify-content: flex-end;
     margin-top: 16px;
+}
+@media (max-width: 991px) {
+    .exercise-layout {
+        grid-template-columns: 1fr;
+    }
 }
 @media (max-width: 575px) {
     .search {
