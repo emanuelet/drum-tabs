@@ -25,6 +25,8 @@ npm exec -- wrangler --config ../wrangler.local.jsonc r2 bucket lifecycle add dr
 
 The lifecycle rule removes soft-deleted R2 objects after 30 days. The daily Worker cron removes the corresponding D1 metadata.
 
+Set `MYTABS_DISABLE_SIGN_UP` to `"true"` in `wrangler.local.jsonc` to disable registration.
+
 ## Import Local Tabs
 
 Create the cloud account separately after migration. Local users, sessions, MCP access, and libraries intentionally remain local.

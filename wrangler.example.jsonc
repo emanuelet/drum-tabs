@@ -25,7 +25,8 @@
         }
     ],
     "vars": {
-        "APP_ORIGIN": "https://REPLACE_WITH_YOUR_DOMAIN"
+        "APP_ORIGIN": "https://REPLACE_WITH_YOUR_DOMAIN",
+        "MYTABS_DISABLE_SIGN_UP": "false"
     },
     "triggers": {
         "crons": ["0 3 * * *"]

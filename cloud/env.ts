@@ -6,6 +6,7 @@ export interface Env {
     TABS_BUCKET: R2Bucket;
     APP_ORIGIN: string;
     AUTH_SECRET: string;
+    MYTABS_DISABLE_SIGN_UP?: string;
     YATTEE_USERNAME?: string;
     YATTEE_PASSWORD?: string;
     YATTEE_BASE_URL?: string;

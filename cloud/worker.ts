@@ -21,6 +21,12 @@ type TabRow = {
 const sourceFormats = new Set(["gp", "gpx", "gp3", "gp4", "gp5", "musicxml", "capx", "txt"]);
 const audioFormats = new Map([["mp3", "audio/mpeg"], ["ogg", "audio/ogg"]]);
 const syncSchema = z.object({ syncMethod: z.enum(["simple", "advanced"]), simpleSync: z.number(), advancedSync: z.string() });
+const registrationSchema = z.object({
+    email: z.email(),
+    name: z.string().trim().min(1).max(100),
+    pin: z.string().regex(/^\d{6}$/, "PIN must be exactly 6 digits"),
+    role: z.enum(["teacher", "learner"]),
+});
 
 function error(message: string, status = 400) {
     return Response.json({ ok: false, error: message, msg: message }, { status });
@@ -35,6 +41,11 @@ function extension(filename: string) {
 export function safeFilename(filename: string) {
     if (!filename || filename.includes("/") || filename.includes("\\") || filename.includes("..")) throw new Error("Invalid filename");
     return filename.replace(/[^A-Za-z0-9._ -]/g, "_");
+}
+
+export function registrationBody(input: unknown) {
+    const { email, name, pin } = registrationSchema.parse(input);
+    return { email, name, password: pin };
 }
 
 export function tabValue(row: TabRow) {
@@ -93,6 +104,8 @@ async function moveObject(bucket: R2Bucket, from: string, to: string) {
 
 const app = new Hono<AppEnv>();
 
+// Registration must go through /api/register so only the initial user can be created.
+app.post("/api/auth/sign-up/email", () => error("Use /api/register", 404));
 app.all("/api/auth/*", (c) => createAuth(c.env, new URL(c.req.url).origin).handler(c.req.raw));
 
 app.get("/api/is-finish-setup", async (c) => {
@@ -104,7 +117,7 @@ app.post("/api/register", async (c) => {
     try {
         const existing = await c.env.DB.prepare("SELECT id FROM user LIMIT 1").first();
         if (existing) return error("User already exists");
-        const body = z.object({ email: z.email(), name: z.string().min(1), password: z.string().min(8) }).parse(await c.req.json());
+        const body = registrationBody(await c.req.json());
         const auth = createAuth(c.env, new URL(c.req.url).origin);
         const result = await auth.api.signUpEmail({ body });
         return c.json(result);

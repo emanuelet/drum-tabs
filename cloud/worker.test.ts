@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { safeFilename, tabValue } from "./worker.ts";
+import { isSignUpDisabled } from "./auth.ts";
+import { registrationBody, safeFilename, tabValue } from "./worker.ts";
 
 describe("cloud worker helpers", () => {
     it("rejects object-key traversal", () => {
@@ -29,5 +30,19 @@ describe("cloud worker helpers", () => {
             public: true,
             fav: false,
         });
+    });
+
+    it("maps the registration PIN to Better Auth's password field", () => {
+        expect(registrationBody({ email: "drummer@example.com", name: "Drummer", pin: "123456", role: "learner" })).toEqual({
+            email: "drummer@example.com",
+            name: "Drummer",
+            password: "123456",
+        });
+    });
+
+    it("respects the Cloud signup-disable binding", () => {
+        expect(isSignUpDisabled({ MYTABS_DISABLE_SIGN_UP: "true" })).toBe(true);
+        expect(isSignUpDisabled({ MYTABS_DISABLE_SIGN_UP: "false" })).toBe(false);
+        expect(isSignUpDisabled({})).toBe(false);
     });
 });
