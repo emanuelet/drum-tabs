@@ -412,6 +412,7 @@ function cloudDependencies(env: Env, request: Request): CloudDependencies {
         },
         tabDetail: {
             showOpenButtons: false,
+            showYoutubeSuggestions: Boolean(env.YATTEE_USERNAME && env.YATTEE_PASSWORD),
             get: async (id) => {
                 const tab = await getTab(env.DB, id);
                 const [audio, youtube] = await Promise.all([
@@ -452,6 +453,7 @@ function cloudDependencies(env: Env, request: Request): CloudDependencies {
                     })),
                 };
             },
+            getLocalPath: async (id) => (await getTab(env.DB, id)).object_key,
         },
         tabMutations: {
             update: async (id, input) => {

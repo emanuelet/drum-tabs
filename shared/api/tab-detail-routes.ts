@@ -13,7 +13,7 @@ export function mountTabDetailRoutes(app: IdentityRouteApp, dependencies: (conte
             const session = await deps.auth.getSession(c.req.raw);
             if (!detail.tab.public && !session) throw new Error("Not logged in");
             const filePath = session && deps.tabDetail.getLocalPath ? await deps.tabDetail.getLocalPath(detail.tab.id) : "";
-            return c.json({ ok: true, showOpenButtons: deps.tabDetail.showOpenButtons, tab: detail.tab, audioList: detail.audioList, youtubeList: detail.youtubeList, filePath });
+            return c.json({ ok: true, showOpenButtons: deps.tabDetail.showOpenButtons, showYoutubeSuggestions: deps.tabDetail.showYoutubeSuggestions, tab: detail.tab, audioList: detail.audioList, youtubeList: detail.youtubeList, filePath });
         } catch (cause) {
             return error(cause instanceof Error ? cause.message : "Tab not found");
         }

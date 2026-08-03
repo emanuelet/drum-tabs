@@ -293,7 +293,7 @@ export default defineComponent({
                     <div class="exercise-grid">
                         <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
                             <button class="exercise-select"
-                                @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
+                                @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
                             <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites" @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
                         </article>
                     </div>
@@ -338,6 +338,7 @@ export default defineComponent({
                         class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
                 </div>
                 <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
+                <p v-if="selected?.subtitle" class="score-subtitle">{{ selected.subtitle }}</p>
                 <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
             </section>
         </div>

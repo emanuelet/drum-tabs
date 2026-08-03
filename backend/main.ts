@@ -200,6 +200,7 @@ export async function main() {
         },
         tabDetail: {
             showOpenButtons: Deno.build.standalone && Deno.build.os === "windows",
+            showYoutubeSuggestions: Boolean(Deno.env.get("YATTEE_USERNAME") && Deno.env.get("YATTEE_PASSWORD")),
             get: async (id) => {
                 const config = await getConfigJSON(id);
                 if (!config) throw new Error("Config.json not found");

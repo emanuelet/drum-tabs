@@ -19,6 +19,7 @@ export default defineComponent({
             youtubeURL: "",
             youtubeList: [],
             youtubeSuggestions: [],
+            showYoutubeSuggestions: false,
             isSearchingYoutube: false,
             audioList: [],
             // isLocalIP: false,
@@ -58,6 +59,7 @@ export default defineComponent({
                 this.audioList = data.audioList;
                 this.filePath = data.filePath;
                 this.showOpenButtons = data.showOpenButtons;
+                this.showYoutubeSuggestions = data.showYoutubeSuggestions;
             } finally {
                 this.isLoading = false;
             }
@@ -453,7 +455,7 @@ export default defineComponent({
                 </div>
             </div>
 
-            <button class="btn btn-outline-secondary mb-3" type="button" @click="searchYoutube" :disabled="isSearchingYoutube">
+            <button v-if="showYoutubeSuggestions" class="btn btn-outline-secondary mb-3" type="button" @click="searchYoutube" :disabled="isSearchingYoutube">
                 {{ isSearchingYoutube ? "Searching..." : "Find YouTube matches" }}
             </button>
             <div v-if="youtubeSuggestions.length" class="mb-4 youtube-suggestions">

@@ -109,6 +109,7 @@ export interface SettingsRouteDependencies extends IdentityRouteDependencies {
 export interface TabDetailPort {
     get(id: string): Promise<{ tab: TabSummary; audioList: unknown[]; youtubeList: unknown[] }>;
     showOpenButtons: boolean;
+    showYoutubeSuggestions: boolean;
     getLocalPath?(id: string): Promise<string>;
 }
 
