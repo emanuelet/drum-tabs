@@ -13,8 +13,9 @@ Drum Tabs is an open source, web based, self-hostable guitar, bass, and drum tab
 
 Drum Tabs is a drum-focused fork of [It's MyTabs](https://github.com/louislam/its-mytabs) by [Louis Lam](https://github.com/louislam).
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/d7859f4a-8ae0-41e2-bdeb-93b900cc0220" />
-<img width="200"  alt="image" src="https://github.com/user-attachments/assets/c980d516-8f6d-4cca-8a59-4a1a4cc75b1b" />
+<img width="1440" height="900" alt="Screenshot 2026-08-03 at 11-33-41 Drum Tabs" src="https://github.com/user-attachments/assets/320129ca-33d1-4be4-8227-9d9af002cead" />
+
+<img width="1440" height="900" alt="exercises" src="https://github.com/user-attachments/assets/a3619c5e-22fe-4c61-a5ed-735591ffd385" />
 
 ## Live Demo
 
