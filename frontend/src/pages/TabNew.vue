@@ -4,7 +4,7 @@ import Vue3Dropzone from "@jaxtheprime/vue3-dropzone";
 import "@jaxtheprime/vue3-dropzone/dist/style.css";
 import { notify } from "@kyvg/vue3-notification";
 import { baseURL } from "../app.js";
-import { supportedFormatCommaString } from "../../../backend/common.js";
+import { supportedFormatCommaString, supportedFormatList } from "../../../backend/common.js";
 
 const alphaTab = await import("@coderline/alphatab");
 
@@ -30,6 +30,14 @@ export default defineComponent({
         selectedMusicXmlFile() {
             const file = this.files[0]?.file;
             return this.files.length === 1 && file && /\.(musicxml|xml)$/i.test(file.name) ? file : null;
+        },
+    },
+    watch: {
+        files(files) {
+            const unsupported = files.find(({ file }) => !supportedFormatList.includes(file.name.split(".").pop()?.toLowerCase()));
+            if (!unsupported) return;
+            this.files = [];
+            notify({ text: `Unsupported tab file: ${unsupported.file.name}. Supported formats: ${supportedFormatCommaString}`, type: "error" });
         },
     },
     methods: {

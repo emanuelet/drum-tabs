@@ -3,7 +3,7 @@ import { defineComponent } from "vue";
 import { baseURL, checkFetch, convertAlphaTexSyncPoint, generalError } from "../app.js";
 import { notify } from "@kyvg/vue3-notification";
 import Vue3Dropzone from "@jaxtheprime/vue3-dropzone";
-import { supportedAudioFormatCommaString, supportedFormatCommaString } from "../../../backend/common.js";
+import { supportedAudioFormatCommaString, supportedAudioFormatList, supportedFormatCommaString, supportedFormatList } from "../../../backend/common.js";
 import SyncOptions from "../components/SyncOptions.vue";
 import { FontAwesomeIcon } from "../icon.ts";
 
@@ -372,6 +372,21 @@ export default defineComponent({
             } catch (e) {
                 notify({ text: e.message || e, type: "error" });
             }
+        },
+    },
+    watch: {
+        tabFiles(files) {
+            const unsupported = files.find(({ file }) => !supportedFormatList.includes(file.name.split(".").pop()?.toLowerCase()));
+            if (!unsupported) return;
+            this.tabFiles = [];
+            notify({ text: `Unsupported tab file: ${unsupported.file.name}. Supported formats: ${supportedFormatCommaString}`, type: "error" });
+        },
+        audioFiles(files) {
+            const unsupported = files.find(({ file }) => !supportedAudioFormatList.includes(file.name.split(".").pop()?.toLowerCase()));
+            if (!unsupported) return;
+            this.audioFiles = [];
+            this.$refs.audioDropzone?.clearFiles();
+            notify({ text: `Unsupported audio file: ${unsupported.file.name}. Supported formats: ${supportedAudioFormatCommaString}`, type: "error" });
         },
     },
 });
