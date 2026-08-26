@@ -7,8 +7,8 @@ The Cloudflare deployment is independent from the local Deno/MCP library. It use
 ```bash
 deno install
 cd cloud
-npm exec -- wrangler d1 create drum-tabs
-npm exec -- wrangler r2 bucket create drum-tabs
+npx -y  wrangler d1 create drum-tabs
+npx -y  wrangler r2 bucket create drum-tabs
 ```
 
 Copy the configuration template, set the returned D1 id and `APP_ORIGIN` in the ignored local configuration, then set the production secret:
@@ -18,9 +18,9 @@ cp ../wrangler.example.jsonc ../wrangler.local.jsonc
 ```
 
 ```bash
-npm exec -- wrangler --config ../wrangler.local.jsonc secret put AUTH_SECRET
-npm exec -- wrangler --config ../wrangler.local.jsonc d1 migrations apply drum-tabs --remote
-npm exec -- wrangler --config ../wrangler.local.jsonc r2 bucket lifecycle add drum-tabs expire-soft-deleted-tabs deleted/ --expire-days 30 --force
+npx -y  wrangler --config ../wrangler.local.jsonc secret put AUTH_SECRET
+npx -y  wrangler --config ../wrangler.local.jsonc d1 migrations apply drum-tabs --remote
+npx -y  wrangler --config ../wrangler.local.jsonc r2 bucket lifecycle add drum-tabs expire-soft-deleted-tabs deleted/ --expire-days 30 --force
 ```
 
 The lifecycle rule removes soft-deleted R2 objects after 30 days. The daily Worker cron removes the corresponding D1 metadata.
@@ -46,4 +46,4 @@ The frontend build requires Deno because its Vite configuration uses JSR imports
 npm run deploy
 ```
 
-Run `npm exec -- wrangler --config ../wrangler.local.jsonc deploy --dry-run` to validate the Worker bundle without deploying it.
+Run `npx -y  wrangler --config ../wrangler.local.jsonc deploy --dry-run` to validate the Worker bundle without deploying it.

@@ -20,7 +20,7 @@
     "npm:@fortawesome/free-regular-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/free-solid-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/vue-fontawesome@3.3.3": "3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.40__typescript@5.9.3_typescript@5.9.3",
-    "npm:@hono/node-server@~2.0.12": "2.0.12_hono@4.12.32",
+    "npm:@hono/node-server@~2.1.1": "2.1.1_hono@4.12.32",
     "npm:@jaxtheprime/vue3-dropzone@3.4": "3.4.5_vue@3.5.40__typescript@5.9.3_typescript@5.9.3",
     "npm:@kyvg/vue3-notification@~3.4.1": "3.4.2_vue@3.5.40__typescript@5.9.3_typescript@5.9.3",
     "npm:@modelcontextprotocol/sdk@1.30": "1.30.0_zod@4.4.3",
@@ -559,12 +559,12 @@
       ],
       "tarball": "http://localhost:4873/@hapi/topo/-/topo-6.0.2.tgz"
     },
-    "@hono/node-server@2.0.12_hono@4.12.32": {
-      "integrity": "sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==",
+    "@hono/node-server@2.1.1_hono@4.12.32": {
+      "integrity": "sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==",
       "dependencies": [
         "hono"
       ],
-      "tarball": "http://localhost:4873/@hono/node-server/-/node-server-2.0.12.tgz"
+      "tarball": "http://localhost:4873/@hono/node-server/-/node-server-2.1.1.tgz"
     },
     "@img/colour@1.1.0": {
       "integrity": "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==",
@@ -3556,7 +3556,7 @@
       "jsr:@std/fs@~1.0.23",
       "jsr:@std/jsonc@~1.0.2",
       "jsr:@std/path@~1.1.4",
-      "npm:@hono/node-server@~2.0.12",
+      "npm:@hono/node-server@~2.1.1",
       "npm:@modelcontextprotocol/sdk@1.30",
       "npm:better-auth@^1.6.25",
       "npm:cheerio@1.2",
