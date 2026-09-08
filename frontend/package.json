@@ -10,7 +10,7 @@
     "dependencies": {
         "better-auth": "catalog:",
         "private-ip": "~3.0.2",
-        "rollup-plugin-visualizer": "^6.0.3",
+        "rollup-plugin-visualizer": "^7.1.1",
         "zod": "catalog:",
         "wasm-media-encoders": "~0.7.0"
     },
@@ -20,21 +20,21 @@
         "@fortawesome/free-regular-svg-icons": "7.3.1",
         "@fortawesome/free-solid-svg-icons": "7.3.1",
         "@fortawesome/vue-fontawesome": "3.3.3",
-        "@jaxtheprime/vue3-dropzone": "~3.4.0",
-        "@kyvg/vue3-notification": "~3.4.1",
+        "@jaxtheprime/vue3-dropzone": "~3.4.5",
+        "@kyvg/vue3-notification": "~3.4.2",
         "@types/node": "catalog:",
         "@vitejs/plugin-vue": "~6.0.8",
-        "@vue/tsconfig": "~0.8.1",
-        "sass-embedded": "1.100.0",
+        "@vue/tsconfig": "~0.9.1",
+        "sass-embedded": "1.104.0",
         "typescript": "catalog:",
-        "vite": "~8.1.5",
+        "vite": "~8.2.2",
         "@coderline/alphatab": "1.8.4",
-        "vue": "~3.5.21",
-        "vue-router": "~5.2.0",
-        "vue-i18n": "~11.1.12",
+        "vue": "~3.5.42",
+        "vue-router": "~5.3.1",
+        "vue-i18n": "~11.4.10",
         "vite-plugin-compression": "~0.5.1",
         "bootstrap": "5.3.8",
-        "bootstrap-vue-next": "~0.45.9",
-        "@playwright/test": "1.62.1"
+        "bootstrap-vue-next": "~1.1.0",
+        "@playwright/test": "1.63.0"
     }
 }

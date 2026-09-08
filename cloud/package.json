@@ -10,16 +10,16 @@
         "typecheck": "tsc --project tsconfig.json --noEmit"
     },
     "dependencies": {
-        "@better-auth/drizzle-adapter": "^1.6.25",
+        "@better-auth/drizzle-adapter": "^1.7.2",
         "better-auth": "catalog:",
         "drizzle-orm": "^0.45.2",
-        "hono": "^4.11.4",
+        "hono": "^4.13.7",
         "zod": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
-        "wrangler": "^4.36.0"
+        "wrangler": "^4.129.0"
     }
 }
