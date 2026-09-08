@@ -8,6 +8,7 @@ import { isLoggedIn } from "../auth-client.js";
 import { getKeySignature } from "../util.ts";
 import TextTabPlayer from "../components/TextTabPlayer.vue";
 import { applyScoreColors, getStaveProfile, overrideHiddenStaves } from "../composables/alphaTabRenderer.js";
+import { countIn } from "../count-in.ts";
 
 const alphaTab = await import("@coderline/alphatab");
 const { ScrollMode, StaveProfile } = alphaTab;
@@ -55,6 +56,11 @@ export default defineComponent({
             scrollMode: ScrollMode.Continuous,
             keySignature: "",
             playbackRange: null,
+            savedPlaybackRange: null,
+            playbackRangeRestoreTimer: undefined,
+            isInitializingAudio: false,
+            isCountingIn: false,
+            seekDownBeat: null,
 
             keyEvents: (e) => {
                 // Do not handle these tagName, because the only input is sync point, it is weird when play space to test the sync point
@@ -122,6 +128,10 @@ export default defineComponent({
     watch: {
         simpleSyncSecond(newVal, oldVal) {
             if (!this.api) {
+                return;
+            }
+
+            if (this.isInitializingAudio) {
                 return;
             }
 
@@ -194,9 +204,15 @@ export default defineComponent({
             if (this.playing) {
                 this.api.settings.player.scrollMode = this.scrollMode;
                 this.api.updateSettings();
-                this.api.play();
+                if (this.enableCountIn && this.needsCustomCountIn()) {
+                    this.startExternalCountIn();
+                } else {
+                    this.api.play();
+                }
                 requestWakeLock();
             } else {
+                countIn.cancel();
+                this.isCountingIn = false;
                 this.api.pause();
                 releaseWakeLock();
             }
@@ -288,6 +304,12 @@ export default defineComponent({
             }
 
             this.api.player.masterVolume = 1;
+            this.applyCountInVolume();
+
+            const range = this.api.playbackRange;
+            if (range) {
+                this.savedPlaybackRange = { startTick: range.startTick, endTick: range.endTick };
+            }
 
             if (this.currentAudio === "synth") {
                 await this.initSynth();
@@ -473,6 +495,7 @@ export default defineComponent({
 
         countIn() {
             this.enableCountIn = !this.enableCountIn;
+            this.applyCountInVolume();
         },
 
         metronome() {
@@ -498,6 +521,19 @@ export default defineComponent({
             this.playing = true;
         },
 
+        startPlayback() {
+            if (this.playing && this.enableCountIn) {
+                this.api.pause();
+                if (this.needsCustomCountIn()) {
+                    this.startExternalCountIn();
+                } else {
+                    this.api.play();
+                }
+                return;
+            }
+            this.play();
+        },
+
         pause() {
             if (!this.api || !this.ready) {
                 return;
@@ -520,7 +556,7 @@ export default defineComponent({
             }
 
             this.api.tickPosition = playbackRange.startTick;
-            this.play();
+            this.startPlayback();
             return true;
         },
 
@@ -572,7 +608,7 @@ export default defineComponent({
                 this.api.tickPosition = firstBeat.absoluteDisplayStart;
             }
 
-            this.play();
+            this.startPlayback();
         },
 
         getFileURL(tempToken) {
@@ -686,6 +722,21 @@ export default defineComponent({
                     this.playbackRange = this.api.playbackRange;
                 });
 
+                this.api.playerReady.on(() => {
+                    this.restorePlaybackRange();
+                });
+
+                this.api.beatMouseDown.on((beat) => {
+                    this.seekDownBeat = this.getBeatKey(beat);
+                });
+                this.api.beatMouseUp.on((beat) => {
+                    const downBeat = this.seekDownBeat;
+                    this.seekDownBeat = null;
+                    if (downBeat && downBeat === this.getBeatKey(beat) && this.playing && this.enableCountIn) {
+                        this.startPlayback();
+                    }
+                });
+
                 // iOS 16.4+: Enable audio playback even when silent switch is ON
                 if ("audioSession" in navigator) {
                     try {
@@ -723,6 +774,7 @@ export default defineComponent({
 
                     // Count in
                     this.enableCountIn = this.getConfig("enableCountIn", false);
+                    this.applyCountInVolume();
 
                     // Looping
                     this.isLooping = this.getConfig("isLooping", false);
@@ -744,9 +796,10 @@ export default defineComponent({
 
                     // List all tracks
                     score.tracks.forEach((track) => {
+                        const name = (track.name ?? "").trim() || (track.shortName ?? "").trim() || getInstrumentName(track.playbackInfo.program);
                         this.tracks.push({
                             id: track.index,
-                            name: getInstrumentName(track.playbackInfo.program),
+                            name,
                             program: track.playbackInfo.program,
                         });
                     });
@@ -771,6 +824,12 @@ export default defineComponent({
                 this.api.playerFinished.on(() => {
                     if (!this.isLooping) {
                         this.playing = false;
+                    } else if (this.enableCountIn) {
+                        const range = this.api.playbackRange;
+                        if (range) {
+                            this.api.tickPosition = range.startTick;
+                        }
+                        this.startPlayback();
                     }
                 });
             });
@@ -794,6 +853,12 @@ export default defineComponent({
             this.simpleSyncSecond = -1;
             this.muteTrackList = {};
             this.playbackRange = null;
+            this.savedPlaybackRange = null;
+            clearTimeout(this.playbackRangeRestoreTimer);
+            this.playbackRangeRestoreTimer = undefined;
+            countIn.cancel();
+            this.isCountingIn = false;
+            this.seekDownBeat = null;
         },
 
         simpleSync(offset) {
@@ -808,6 +873,67 @@ export default defineComponent({
             const syncPoints = convertAlphaTexSyncPoint(syncPointsText);
             this.api.score.applyFlatSyncPoints(syncPoints);
             console.log("Applying advanced sync points:", syncPoints);
+        },
+
+        getBeatKey(beat) {
+            const modelBeat = beat?.beat ?? beat;
+            const bar = modelBeat?.voice?.bar;
+            return bar ? `${bar.index}:${modelBeat.index}:${modelBeat.absolutePlaybackStart}` : null;
+        },
+
+        needsCustomCountIn() {
+            return this.currentAudio.startsWith("audio-") || this.currentAudio.startsWith("youtube-") || this.currentAudio === "backingTrack";
+        },
+
+        applyCountInVolume() {
+            if (this.api) {
+                this.api.countInVolume = this.enableCountIn && this.currentAudio === "synth" ? 1 : 0;
+            }
+        },
+
+        getCountInInfo() {
+            const tick = this.api.tickPosition ?? 0;
+            let bar = this.api.score.masterBars[0];
+            for (const masterBar of this.api.score.masterBars) {
+                if (masterBar.start <= tick) {
+                    bar = masterBar;
+                } else {
+                    break;
+                }
+            }
+            const bpm = bar.tempoAutomations?.[0]?.value ?? 120;
+            return { bpm: bpm * (this.api.playbackSpeed ?? 1), beats: bar.timeSignatureNumerator ?? 4 };
+        },
+
+        startExternalCountIn() {
+            countIn.cancel();
+            this.isCountingIn = true;
+            countIn.start({
+                ...this.getCountInInfo(),
+                onFinished: () => {
+                    this.isCountingIn = false;
+                    if (this.playing) {
+                        const handler = this.api.player.output?.handler;
+                        if (handler?.play) {
+                            handler.play();
+                        } else {
+                            this.api.play();
+                        }
+                    }
+                },
+            });
+        },
+
+        restorePlaybackRange() {
+            if (!this.savedPlaybackRange || !this.api) {
+                return;
+            }
+            this.api.playbackRange = this.savedPlaybackRange;
+            clearTimeout(this.playbackRangeRestoreTimer);
+            this.playbackRangeRestoreTimer = setTimeout(() => {
+                this.savedPlaybackRange = null;
+                this.playbackRangeRestoreTimer = undefined;
+            }, 1500);
         },
 
         // Style the score with custom colors
@@ -911,6 +1037,7 @@ export default defineComponent({
                 return;
             }
 
+            this.isInitializingAudio = true;
             this.closeAllList();
 
             const audioPlayer = this.$refs.audioPlayer;
@@ -947,7 +1074,7 @@ export default defineComponent({
 
                 let updateTimer = 0;
                 const onTimeUpdate = () => {
-                    this.api?.player?.output?.updatePosition(
+                    this.api?.player?.output?.updatePosition?.(
                         audioPlayer.currentTime * 1000,
                     );
                 };
@@ -966,6 +1093,10 @@ export default defineComponent({
                     // If the audio ended, the "pause" event will also be triggered
                     // Ignore this, because we have "ended" event to handle it
                     if (audioPlayer.ended) {
+                        return;
+                    }
+
+                    if (this.isCountingIn) {
                         return;
                     }
 
@@ -1002,11 +1133,15 @@ export default defineComponent({
             this.api.updateSettings();
 
             let found = false;
+            let syncMethod;
+            let syncData;
 
             // Get offset from youtubeList
             for (const audio of this.audioList) {
                 if (audio.filename === filename) {
                     this.audio = audio;
+                    syncMethod = audio.syncMethod;
+                    syncData = audio.syncMethod === "advanced" ? audio.advancedSync : audio.simpleSync;
                     if (audio.syncMethod === "advanced") {
                         this.advancedSync(audio.advancedSync);
                     } else {
@@ -1019,6 +1154,7 @@ export default defineComponent({
 
             // Probably provided an audio file not in the list, switch to synth
             if (!found) {
+                this.isInitializingAudio = false;
                 notify({
                     type: "error",
                     title: "Error",
@@ -1040,9 +1176,17 @@ export default defineComponent({
             audioPlayer.playbackRate = this.api.playbackSpeed;
 
             this.pause();
+            await this.$nextTick();
+            if (syncMethod === "advanced") {
+                this.advancedSync(syncData);
+            } else {
+                this.simpleSync(syncData);
+            }
+            this.isInitializingAudio = false;
         },
 
         async initYoutube(videoID) {
+            this.isInitializingAudio = true;
             this.closeAllList();
 
             if (!this.youtubePlayer) {
@@ -1055,11 +1199,15 @@ export default defineComponent({
             this.api.updateSettings();
 
             let found = false;
+            let syncMethod;
+            let syncData;
 
             // Get offset from youtubeList
             for (const yt of this.youtubeList) {
                 if (yt.videoID === videoID) {
                     this.youtube = yt;
+                    syncMethod = yt.syncMethod;
+                    syncData = yt.syncMethod === "advanced" ? yt.advancedSync : yt.simpleSync;
                     if (yt.syncMethod === "advanced") {
                         this.advancedSync(yt.advancedSync);
                     } else {
@@ -1072,6 +1220,7 @@ export default defineComponent({
 
             // Probably provided a video ID not in the list, switch to synth
             if (!found) {
+                this.isInitializingAudio = false;
                 notify({
                     type: "error",
                     title: "Error",
@@ -1088,6 +1237,13 @@ export default defineComponent({
             this.youtubePlayer.cueVideoById(videoID);
             this.youtubePlayer.setPlaybackRate(this.api.playbackSpeed);
             this.pause();
+            await this.$nextTick();
+            if (syncMethod === "advanced") {
+                this.advancedSync(syncData);
+            } else {
+                this.simpleSync(syncData);
+            }
+            this.isInitializingAudio = false;
         },
 
         async initYoutubePlayer() {
@@ -1144,7 +1300,7 @@ export default defineComponent({
                         switch (e.data) {
                             case YT.PlayerState.PLAYING:
                                 currentTimeInterval = window.setInterval(() => {
-                                    this.api?.player?.output?.updatePosition(player.getCurrentTime() * 1000);
+                                    this.api?.player?.output?.updatePosition?.(player.getCurrentTime() * 1000);
                                 }, 50);
                                 this.playing = true;
                                 this.api?.play();
@@ -1156,6 +1312,9 @@ export default defineComponent({
                                 break;
                             case YT.PlayerState.PAUSED:
                                 window.clearInterval(currentTimeInterval);
+                                if (this.isCountingIn) {
+                                    break;
+                                }
                                 this.playing = false;
                                 this.api?.pause();
                                 break;
@@ -1534,7 +1693,7 @@ export default defineComponent({
                     <font-awesome-icon :icon='["fas", "repeat"]' v-else />
                     Loop
                 </button>
-                <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn, disabled: currentAudio !== "synth" }'>
+                <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn }'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableCountIn" />
                     <font-awesome-icon :icon='["fas", "list-ol"]' v-else />
                     Count in

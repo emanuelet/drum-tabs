@@ -24,6 +24,8 @@
     "npm:@jaxtheprime/vue3-dropzone@3.4": "3.4.5_vue@3.5.40__typescript@5.9.3_typescript@5.9.3",
     "npm:@kyvg/vue3-notification@~3.4.1": "3.4.2_vue@3.5.40__typescript@5.9.3_typescript@5.9.3",
     "npm:@modelcontextprotocol/sdk@1.30": "1.30.0_zod@4.4.3",
+    "npm:@playwright/test@*": "1.62.1",
+    "npm:@playwright/test@1.62.1": "1.62.1",
     "npm:@types/node@^26.1.1": "26.1.1",
     "npm:@vitejs/plugin-vue@~6.0.8": "6.0.8_vite@8.1.5__@types+node@26.1.1__sass-embedded@1.100.0__yaml@2.9.0_vue@3.5.40__typescript@5.9.3_@types+node@26.1.1_sass-embedded@1.100.0_typescript@5.9.3",
     "npm:@vue/tsconfig@~0.8.1": "0.8.1_typescript@5.9.3_vue@3.5.40__typescript@5.9.3",
@@ -48,6 +50,8 @@
     "npm:vue-router@5.2": "5.2.0_vite@8.1.5__@types+node@26.1.1__sass-embedded@1.100.0__yaml@2.9.0_vue@3.5.40__typescript@5.9.3",
     "npm:vue@~3.5.21": "3.5.40_typescript@5.9.3",
     "npm:wait-on@*": "9.1.0",
+    "npm:wasm-media-encoders@*": "0.7.0",
+    "npm:wasm-media-encoders@0.7": "0.7.0",
     "npm:wrangler@*": "4.114.0",
     "npm:wrangler@^4.36.0": "4.114.0",
     "npm:zod@^4.4.3": "4.4.3"
@@ -980,6 +984,14 @@
       "scripts": true,
       "tarball": "http://localhost:4873/@parcel/watcher/-/watcher-2.6.0.tgz"
     },
+    "@playwright/test@1.62.1": {
+      "integrity": "sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==",
+      "dependencies": [
+        "playwright"
+      ],
+      "bin": true,
+      "tarball": "http://localhost:4873/@playwright/test/-/test-1.62.1.tgz"
+    },
     "@popperjs/core@2.11.8": {
       "integrity": "sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==",
       "tarball": "http://localhost:4873/@popperjs/core/-/core-2.11.8.tgz"
@@ -1113,6 +1125,13 @@
     "@standard-schema/spec@1.1.0": {
       "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
       "tarball": "http://localhost:4873/@standard-schema/spec/-/spec-1.1.0.tgz"
+    },
+    "@swc/helpers@0.5.23": {
+      "integrity": "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==",
+      "dependencies": [
+        "tslib"
+      ],
+      "tarball": "http://localhost:4873/@swc/helpers/-/helpers-0.5.23.tgz"
     },
     "@tybys/wasm-util@0.10.3": {
       "integrity": "sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==",
@@ -2060,6 +2079,12 @@
       ],
       "tarball": "http://localhost:4873/fs-extra/-/fs-extra-10.1.0.tgz"
     },
+    "fsevents@2.3.2": {
+      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
+      "os": ["darwin"],
+      "scripts": true,
+      "tarball": "http://localhost:4873/fsevents/-/fsevents-2.3.2.tgz"
+    },
     "fsevents@2.3.3": {
       "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
       "os": ["darwin"],
@@ -2619,6 +2644,22 @@
         "pathe"
       ],
       "tarball": "http://localhost:4873/pkg-types/-/pkg-types-2.3.1.tgz"
+    },
+    "playwright-core@1.62.1": {
+      "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
+      "bin": true,
+      "tarball": "http://localhost:4873/playwright-core/-/playwright-core-1.62.1.tgz"
+    },
+    "playwright@1.62.1": {
+      "integrity": "sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==",
+      "dependencies": [
+        "playwright-core"
+      ],
+      "optionalDependencies": [
+        "fsevents@2.3.2"
+      ],
+      "bin": true,
+      "tarball": "http://localhost:4873/playwright/-/playwright-1.62.1.tgz"
     },
     "postcss@8.5.23": {
       "integrity": "sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg==",
@@ -3275,7 +3316,7 @@
         "yaml"
       ],
       "optionalDependencies": [
-        "fsevents"
+        "fsevents@2.3.3"
       ],
       "optionalPeers": [
         "@types/node",
@@ -3383,6 +3424,13 @@
       "bin": true,
       "tarball": "http://localhost:4873/wait-on/-/wait-on-9.1.0.tgz"
     },
+    "wasm-media-encoders@0.7.0": {
+      "integrity": "sha512-Sp4wUasgxOK/IFfNhpon6LQQgYGwtpxyV4isjGIe1rvhnJL3w2KYr4f+CdqDNtGPDcgCDRY+uBanVfSx6Si0WQ==",
+      "dependencies": [
+        "@swc/helpers"
+      ],
+      "tarball": "http://localhost:4873/wasm-media-encoders/-/wasm-media-encoders-0.7.0.tgz"
+    },
     "webpack-virtual-modules@0.6.2": {
       "integrity": "sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==",
       "tarball": "http://localhost:4873/webpack-virtual-modules/-/webpack-virtual-modules-0.6.2.tgz"
@@ -3442,7 +3490,7 @@
         "workerd"
       ],
       "optionalDependencies": [
-        "fsevents"
+        "fsevents@2.3.3"
       ],
       "bin": true,
       "tarball": "http://localhost:4873/wrangler/-/wrangler-4.114.0.tgz"
@@ -3593,6 +3641,7 @@
             "npm:@fortawesome/vue-fontawesome@3.3.3",
             "npm:@jaxtheprime/vue3-dropzone@3.4",
             "npm:@kyvg/vue3-notification@~3.4.1",
+            "npm:@playwright/test@1.62.1",
             "npm:@types/node@^26.1.1",
             "npm:@vitejs/plugin-vue@~6.0.8",
             "npm:@vue/tsconfig@~0.8.1",
@@ -3608,6 +3657,7 @@
             "npm:vue-i18n@~11.1.12",
             "npm:vue-router@5.2",
             "npm:vue@~3.5.21",
+            "npm:wasm-media-encoders@0.7",
             "npm:zod@^4.4.3"
           ]
         }

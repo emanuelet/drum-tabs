@@ -6,4 +6,6 @@ node_modules
 /private/
 /*.exe
 .env
+test-results/
+playwright-report/
 wrangler.local.jsonc

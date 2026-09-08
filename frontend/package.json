@@ -11,7 +11,8 @@
         "better-auth": "catalog:",
         "private-ip": "~3.0.2",
         "rollup-plugin-visualizer": "^6.0.3",
-        "zod": "catalog:"
+        "zod": "catalog:",
+        "wasm-media-encoders": "~0.7.0"
     },
     "devDependencies": {
         "@coderline/alphatab-vite": "1.8.4",
@@ -33,6 +34,7 @@
         "vue-i18n": "~11.1.12",
         "vite-plugin-compression": "~0.5.1",
         "bootstrap": "5.3.8",
-        "bootstrap-vue-next": "~0.45.9"
+        "bootstrap-vue-next": "~0.45.9",
+        "@playwright/test": "1.62.1"
     }
 }
