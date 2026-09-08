@@ -9,6 +9,7 @@ import { getKeySignature } from "../util.ts";
 import TextTabPlayer from "../components/TextTabPlayer.vue";
 import { applyScoreColors, getStaveProfile, overrideHiddenStaves } from "../composables/alphaTabRenderer.js";
 import { countIn } from "../count-in.ts";
+import { metronome } from "../metronome.ts";
 
 const alphaTab = await import("@coderline/alphatab");
 const { ScrollMode, StaveProfile } = alphaTab;
@@ -257,11 +258,7 @@ export default defineComponent({
             if (!this.api) {
                 return;
             }
-            if (this.enableMetronome) {
-                this.api.metronomeVolume = 1;
-            } else {
-                this.api.metronomeVolume = 0;
-            }
+            this.applyMetronome();
             this.setConfig("enableMetronome", this.enableMetronome);
         },
 
@@ -306,6 +303,7 @@ export default defineComponent({
 
             this.api.player.masterVolume = 1;
             this.applyCountInVolume();
+            this.applyMetronome();
 
             if (!this.currentAudio.startsWith("youtube-")) {
                 this.destroyYoutubePlayer();
@@ -720,6 +718,11 @@ export default defineComponent({
                 // Exposing api to window for debugging
                 window.api = this.api;
 
+                // MIDI metronome events survive loop restarts; alphaTab's native
+                // Web Audio click can become silent while playback continues.
+                this.api.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
+                this.api.midiEventsPlayed.on((args) => metronome.handleEvents(args.events));
+
                 // Used for showing/hiding the "Restart" button
                 this.api.playbackRangeChanged.on(() => {
                     this.playbackRange = this.api.playbackRange;
@@ -860,6 +863,7 @@ export default defineComponent({
             this.playbackRangeRestoreTimer = undefined;
             countIn.cancel();
             this.isCountingIn = false;
+            metronome.setEnabled(false);
             this.seekDownBeat = null;
         },
 
@@ -891,6 +895,14 @@ export default defineComponent({
             if (this.api) {
                 this.api.countInVolume = this.enableCountIn && this.currentAudio === "synth" ? 1 : 0;
             }
+        },
+
+        applyMetronome() {
+            if (!this.api) {
+                return;
+            }
+            this.api.metronomeVolume = 0;
+            metronome.setEnabled(this.enableMetronome && this.currentAudio === "synth");
         },
 
         getCountInInfo() {
