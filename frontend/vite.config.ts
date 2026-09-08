@@ -37,6 +37,8 @@ export default defineConfig({
         viteCompression({
             algorithm: "gzip",
             filter: viteCompressionFilter,
+            // Cloudflare's SPA fallback serves the uncompressed index.html.
+            deleteOriginFile: false,
         }),
         // https://github.com/denoland/deno/issues/30430
         // Deno 2.4.4 issue, temporarily disable brotli

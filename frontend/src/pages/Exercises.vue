@@ -62,6 +62,7 @@ export default defineComponent({
             ready: false,
             assignmentsByExercise: {},
             user: null,
+            fullscreen: false,
         };
     },
     computed: {
@@ -90,6 +91,7 @@ export default defineComponent({
             display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
         });
         this.api.playerStateChanged.on((event) => this.playing = event.state === alphaTab.synth.PlayerState.Playing);
+        document.addEventListener("fullscreenchange", this.updateFullscreenState);
         try {
             const [exerciseRes, assignmentRes, userRes] = await Promise.all([
                 fetch(baseURL + "/api/exercises", { credentials: "include" }),
@@ -113,6 +115,7 @@ export default defineComponent({
         }
     },
     beforeUnmount() {
+        document.removeEventListener("fullscreenchange", this.updateFullscreenState);
         this.api?.destroy();
     },
     methods: {
@@ -139,6 +142,16 @@ export default defineComponent({
             if (!this.api || !this.selected) return;
             if (this.playing) this.api.pause();
             else this.api.play();
+        },
+        async toggleFullscreen() {
+            if (document.fullscreenElement === this.$refs.player) {
+                await document.exitFullscreen();
+            } else {
+                await this.$refs.player.requestFullscreen();
+            }
+        },
+        updateFullscreenState() {
+            this.fullscreen = document.fullscreenElement === this.$refs.player;
         },
         updatePlayback() {
             if (!this.api || !this.selected) return;
@@ -294,7 +307,8 @@ export default defineComponent({
                         <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
                             <button class="exercise-select"
                                 @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
-                            <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites" @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
+                            <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites"
+                                @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
                         </article>
                     </div>
                 </section>
@@ -328,10 +342,13 @@ export default defineComponent({
                     <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
                 </section>
             </div>
-            <section class="player" :class="{ light: setting.scoreColor === 'light' }">
+            <section ref="player" class="player" :class="{ light: setting.scoreColor === 'light' }">
+                <button class="btn btn-outline-secondary fullscreen-button" type="button" :title="fullscreen ? 'Exit full screen' : 'Full screen'"
+                    :aria-label="fullscreen ? 'Exit full screen' : 'Full screen'" @click="toggleFullscreen"><font-awesome-icon :icon="fullscreen ? 'compress' : 'expand'" /></button>
                 <div class="controls">
                     <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
-                    <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <output>{{ tempo }} BPM</output></label>
+                    <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <input v-model.number="tempo"
+                            :disabled="!selected" type="number" min="30" max="240" step="1" aria-label="Tempo in BPM" /> BPM</label>
                     <label><input v-model="metronome" type="checkbox" /> Metronome</label>
                     <label><input v-model="looping" type="checkbox" /> Loop</label>
                     <label v-if="exerciseTracks.length > 1"
@@ -494,16 +511,36 @@ header {
     min-width: 34px;
 }
 .player {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     border: 1px solid #555;
     border-radius: 8px;
     overflow: hidden;
+}
+.player:fullscreen {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    background: var(--bs-body-bg);
+}
+.player:fullscreen .score {
+    flex: 1;
+    overflow: auto;
+}
+.fullscreen-button {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    right: 8px;
 }
 .controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 16px;
-    padding: 12px;
+    padding: 12px 56px 12px 12px;
     background: rgba(128, 128, 128, .12);
 }
 .controls input[type="number"] {
@@ -516,9 +553,6 @@ header {
 }
 .tempo-control input[type="range"] {
     width: min(220px, 42vw);
-}
-.tempo-control output {
-    min-width: 58px;
 }
 .track-control {
     display: flex;
