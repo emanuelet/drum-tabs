@@ -6,7 +6,7 @@ Deno.env.set("MYTABS_PORT", Deno.env.get("MYTABS_E2E_PORT") ?? "47779");
 Deno.env.set("DATA_DIR", await Deno.makeTempDir({ prefix: "drum-tabs-e2e-" }));
 
 const { main } = await import("../../backend/main.ts");
-const { addAudio, getConfigJSON, getTab, updateConfigJSON } = await import("../../backend/tab.ts");
+const { addAudio, addYoutube, getConfigJSON, getTab, updateConfigJSON } = await import("../../backend/tab.ts");
 
 await main();
 
@@ -33,6 +33,7 @@ for (const chunk of chunks) {
 }
 
 await addAudio(tab, audio, "e2e-silence.ogg");
+await addYoutube("1", "e2e-youtube");
 const config = await getConfigJSON("1");
 const audioMeta = config?.audio.find((item) => item.filename === "e2e-silence.ogg");
 if (!audioMeta) {

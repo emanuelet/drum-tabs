@@ -21,6 +21,8 @@ export default defineComponent({
     beforeUnmount() {
         clearInterval(this.scrollTimer);
         this.$refs.sheet?.removeEventListener("scroll", this.onManualScroll);
+        this.youtube?.destroy();
+        this.youtube = null;
     },
     methods: {
         async togglePlay() {
@@ -59,7 +61,10 @@ export default defineComponent({
                 videoId: this.source.slice(8),
                 events: {
                     onStateChange: (event) => {
-                        if (event.data === window.YT.PlayerState.ENDED) {
+                        if (event.data === window.YT.PlayerState.PLAYING) {
+                            this.playing = true;
+                            this.startScroll();
+                        } else if (event.data === window.YT.PlayerState.PAUSED || event.data === window.YT.PlayerState.ENDED) {
                             this.playing = false;
                             clearInterval(this.scrollTimer);
                         }

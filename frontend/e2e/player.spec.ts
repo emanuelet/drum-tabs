@@ -1,5 +1,93 @@
-import { expect, test } from "@playwright/test";
-import { AUDIO_FILENAME, openTab, waitForDemoTab } from "./helpers.ts";
+// deno-lint-ignore-file no-explicit-any no-window no-window-prefix -- browser-context test helpers mimic YouTube's untyped iframe API.
+import { expect, type Page, test } from "@playwright/test";
+import { AUDIO_FILENAME, openTab, waitForDemoTab, YOUTUBE_VIDEO_ID } from "./helpers.ts";
+
+async function installYoutubeStub(page: Page) {
+    await page.addInitScript(() => {
+        const activeIntervals = new Set<number>();
+        const setInterval = window.setInterval.bind(window);
+        const clearInterval = window.clearInterval.bind(window);
+
+        window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: any[]) => {
+            const id = setInterval(handler, timeout, ...args) as unknown as number;
+            activeIntervals.add(id);
+            return id;
+        }) as typeof window.setInterval;
+        window.clearInterval = ((id?: number) => {
+            activeIntervals.delete(id as number);
+            clearInterval(id);
+        }) as typeof window.clearInterval;
+
+        class Player {
+            config: any;
+            state = 5;
+            currentTime = 0;
+            seeks: number[] = [];
+
+            constructor(_element: Element, config: any) {
+                this.config = config;
+                (window as any).__youtubeTest.players.push(this);
+                queueMicrotask(() => config.events.onReady({ target: this }));
+            }
+
+            emit(state: number) {
+                this.state = state;
+                this.config.events.onStateChange({ data: state, target: this });
+            }
+
+            cueVideoById() {
+                this.emit((window as any).YT.PlayerState.CUED);
+            }
+
+            playVideo() {
+                this.emit((window as any).YT.PlayerState.PLAYING);
+            }
+
+            pauseVideo() {
+                this.emit((window as any).YT.PlayerState.PAUSED);
+            }
+
+            destroy() {
+                (window as any).__youtubeTest.destroyed++;
+            }
+
+            getCurrentTime() {
+                return this.currentTime;
+            }
+
+            getDuration() {
+                return 300;
+            }
+
+            getPlayerState() {
+                return this.state;
+            }
+
+            getPlaybackRate() {
+                return 1;
+            }
+
+            setPlaybackRate() {}
+
+            getVolume() {
+                return 100;
+            }
+
+            setVolume() {}
+
+            seekTo(time: number) {
+                this.currentTime = time;
+                this.seeks.push(time);
+            }
+        }
+
+        (window as any).__youtubeTest = { activeIntervals, destroyed: 0, players: [] };
+        (window as any).YT = {
+            Player,
+            PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
+        };
+    });
+}
 
 test.beforeEach(async ({ request }) => {
     await waitForDemoTab(request);
@@ -55,4 +143,49 @@ test("shows a long or short track name before its MIDI fallback", async ({ page 
     expected.forEach((name, index) => {
         if (name) expect(names[index].trim()).toBe(name);
     });
+});
+
+test("keeps one YouTube sync timer across buffering", async ({ page }) => {
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    const baseline = await page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size);
+    await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.PLAYING));
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline + 1);
+
+    await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.BUFFERING));
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline);
+
+    await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.PLAYING));
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline + 1);
+
+    await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.PLAYING));
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline + 1);
+});
+
+test("disposes YouTube when switching sources", async ({ page }) => {
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    await page.locator(".audio-selector .button").click();
+    await page.locator(".audio-list .audio.item", { hasText: "Synth" }).click();
+
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.destroyed)).toBe(1);
+});
+
+test("applies deferred YouTube seeks after cueing", async ({ page }) => {
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    await page.evaluate(() => {
+        const player = (window as any).__youtubeTest.players[0];
+        player.state = -1;
+        (window as any).api.player.output.handler.seekTo(12_000);
+        player.emit((window as any).YT.PlayerState.CUED);
+    });
+
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.players[0].seeks.at(-1))).toBe(12);
 });

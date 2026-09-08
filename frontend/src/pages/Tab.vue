@@ -26,6 +26,7 @@ export default defineComponent({
             audioHandler: null,
             alphaTabYoutubeHandler: null,
             youtubePlayer: null,
+            youtubeSyncTimer: undefined,
             isLoggedIn: false,
             title: "",
             artist: "",
@@ -306,6 +307,10 @@ export default defineComponent({
             this.api.player.masterVolume = 1;
             this.applyCountInVolume();
 
+            if (!this.currentAudio.startsWith("youtube-")) {
+                this.destroyYoutubePlayer();
+            }
+
             const range = this.api.playbackRange;
             if (range) {
                 this.savedPlaybackRange = { startTick: range.startTick, endTick: range.endTick };
@@ -412,8 +417,6 @@ export default defineComponent({
                 text: e.message,
             });
         }
-
-        console.log("Mounted");
     },
     beforeUnmount() {
         console.log("Before unmount");
@@ -748,8 +751,6 @@ export default defineComponent({
 
                 // Score Loaded
                 this.api.scoreLoaded.on(async (score) => {
-                    console.log("Score loaded");
-
                     applyScoreColors(score, this.setting, alphaTab);
 
                     // Track
@@ -836,6 +837,7 @@ export default defineComponent({
         },
 
         destroyContainer() {
+            this.destroyYoutubePlayer();
             this.api?.destroy();
             this.api = undefined;
 
@@ -1189,6 +1191,8 @@ export default defineComponent({
             this.isInitializingAudio = true;
             this.closeAllList();
 
+            this.stopYoutubeSync();
+
             if (!this.youtubePlayer) {
                 await this.initYoutubePlayer();
             }
@@ -1283,7 +1287,15 @@ export default defineComponent({
             }
 
             const youtubePlayerReady = Promise.withResolvers();
-            let currentTimeInterval = 0;
+            let initialSeek = -1;
+            const applyInitialSeek = () => {
+                if (initialSeek < 0) {
+                    return;
+                }
+
+                player.seekTo(initialSeek);
+                initialSeek = -1;
+            };
             const player = new YT.Player(playerElement, {
                 height: "180",
                 width: "320",
@@ -1299,24 +1311,30 @@ export default defineComponent({
                         //
                         switch (e.data) {
                             case YT.PlayerState.PLAYING:
-                                currentTimeInterval = window.setInterval(() => {
+                                this.stopYoutubeSync();
+                                this.youtubeSyncTimer = window.setInterval(() => {
                                     this.api?.player?.output?.updatePosition?.(player.getCurrentTime() * 1000);
                                 }, 50);
                                 this.playing = true;
-                                this.api?.play();
+                                applyInitialSeek();
                                 break;
                             case YT.PlayerState.ENDED:
-                                window.clearInterval(currentTimeInterval);
+                                this.stopYoutubeSync();
                                 this.playing = false;
                                 this.api?.stop();
                                 break;
                             case YT.PlayerState.PAUSED:
-                                window.clearInterval(currentTimeInterval);
+                                this.stopYoutubeSync();
                                 if (this.isCountingIn) {
                                     break;
                                 }
                                 this.playing = false;
-                                this.api?.pause();
+                                break;
+                            case YT.PlayerState.BUFFERING:
+                                this.stopYoutubeSync();
+                                break;
+                            case YT.PlayerState.CUED:
+                                applyInitialSeek();
                                 break;
                             default:
                                 break;
@@ -1334,7 +1352,6 @@ export default defineComponent({
             await youtubePlayerReady.promise;
             console.log("YouTube Player ready");
 
-            let initialSeek = -1;
             const alphaTabYoutubeHandler = {
                 get backingTrackDuration() {
                     return player.getDuration() * 1000;
@@ -1365,10 +1382,7 @@ export default defineComponent({
                 },
                 play() {
                     player.playVideo();
-                    if (initialSeek >= 0) {
-                        player.seekTo(initialSeek);
-                        initialSeek = -1;
-                    }
+                    applyInitialSeek();
                 },
                 pause() {
                     player.pauseVideo();
@@ -1378,6 +1392,20 @@ export default defineComponent({
             this.youtubePlayer = player;
             this.alphaTabYoutubeHandler = alphaTabYoutubeHandler;
             clearTimeout(ytWarning);
+        },
+
+        stopYoutubeSync() {
+            if (this.youtubeSyncTimer !== undefined) {
+                window.clearInterval(this.youtubeSyncTimer);
+                this.youtubeSyncTimer = undefined;
+            }
+        },
+
+        destroyYoutubePlayer() {
+            this.stopYoutubeSync();
+            this.youtubePlayer?.destroy();
+            this.youtubePlayer = null;
+            this.alphaTabYoutubeHandler = null;
         },
 
         getStaveProfile() {

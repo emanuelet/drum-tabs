@@ -2,6 +2,7 @@ import { type APIRequestContext, expect, type Page } from "@playwright/test";
 
 export const TAB_ID = "1";
 export const AUDIO_FILENAME = "e2e-silence.ogg";
+export const YOUTUBE_VIDEO_ID = "e2e-youtube";
 
 export async function openTab(page: Page, source = "synth"): Promise<void> {
     await page.goto(`/tab/${TAB_ID}?audio=${source}`);

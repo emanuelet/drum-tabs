@@ -88,7 +88,7 @@ export const router = createRouter({
 });
 
 // Demo mode navigation guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
     if (window.isDemo === true) {
         // Allow access to Settings, Tab pages, and Register (setup) page only
         const isTabPage = to.path.startsWith("/tab/");
@@ -97,11 +97,7 @@ router.beforeEach((to, from, next) => {
 
         if (!isTabPage && !isSettingsPage && !isRegisterPage) {
             // Redirect to demo tab
-            next("/tab/1?audio=youtube-VuKSlOT__9s&track=2");
-        } else {
-            next();
+            return "/tab/1?audio=youtube-VuKSlOT__9s&track=2";
         }
-    } else {
-        next();
     }
 });
