@@ -1711,15 +1711,21 @@ export default defineComponent({
                     </button>
                     <div class="speed-selector-popover" v-if="showSpeedSelector">
                         <div class="speed-selector-header">
-                            <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
-                            <label class="visually-hidden" for="bpm-input">BPM</label>
-                            <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
-                                @change="setBpm($event.target.value)" />
-                            <span>BPM</span>
-                            <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
+                            <div class="speed-selector-bpm">
+                                <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
+                                <label class="visually-hidden" for="bpm-input">BPM</label>
+                                <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
+                                    @change="setBpm($event.target.value)" />
+                                <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
+                                <span>BPM</span>
+                            </div>
+                            <button class="speed-reset" type="button" :disabled="speed === 100" :title="`Reset to ${tempo} BPM`" @click="speed = 100">
+                                <font-awesome-icon icon="rotate-left" /> Reset
+                            </button>
                         </div>
                         <div class="speed-scale">
-                            <span v-for="mark in speedMarks" :key="mark" class="speed-mark" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }">{{ mark }}</span>
+                            <button v-for="mark in speedMarks" :key="mark" class="speed-mark" type="button" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }"
+                                :aria-label="`Set playback speed to ${mark}%`" @click="speed = mark">{{ mark }}</button>
                             <div class="speed-ticks" aria-hidden="true">
                                 <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
                             </div>
@@ -2256,13 +2262,18 @@ $padding: 20px;
 .speed-selector-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: fit-content;
+    justify-content: space-between;
+    width: 100%;
     padding-bottom: 10px;
     border-bottom: 1px solid currentColor;
 
-    button {
+    .speed-selector-bpm {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .speed-selector-bpm button {
         padding: 0;
         color: inherit;
         font-size: 24px;
@@ -2275,7 +2286,7 @@ $padding: 20px;
         }
     }
 
-    input {
+    .speed-selector-bpm input {
         width: 64px;
         padding: 0;
         color: inherit;
@@ -2283,6 +2294,24 @@ $padding: 20px;
         background: transparent;
         border: 0;
         font-size: 16px;
+    }
+
+    .speed-reset {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 6px;
+        color: inherit;
+        background: transparent;
+        border: 0;
+
+        &:hover:not(:disabled) {
+            color: #65d52f;
+        }
+
+        &:disabled {
+            opacity: .45;
+        }
     }
 }
 
@@ -2368,11 +2397,18 @@ $padding: 20px;
 
 .speed-mark {
     position: absolute;
+    z-index: 3;
     bottom: 48px;
+    padding: 0;
     color: color-mix(in srgb, currentColor 65%, transparent);
-    font-size: 16px;
+    background: transparent;
+    border: 0;
+    font-size: 20px;
+    cursor: pointer;
     transform: translateX(-50%);
 
+    &:hover,
+    &:focus-visible,
     &.active {
         color: #65d52f;
         font-weight: 700;

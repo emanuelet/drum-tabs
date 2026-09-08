@@ -30,6 +30,7 @@ import {
     faPlay,
     faPlus,
     faRepeat,
+    faRotateLeft,
     faStar,
     faStopwatch,
     faTrashCan,
@@ -66,6 +67,7 @@ library.add([
     faGaugeHigh,
     faListOl,
     faRepeat,
+    faRotateLeft,
     faStopwatch,
     faVolumeHigh,
 ]);
