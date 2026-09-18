@@ -23,6 +23,7 @@
     "npm:@jaxtheprime/vue3-dropzone@~3.4.5": "3.4.5_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
     "npm:@kyvg/vue3-notification@~3.4.2": "3.4.2_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
     "npm:@modelcontextprotocol/sdk@1.30": "1.30.0_zod@4.6.5",
+    "npm:@playwright/test@*": "1.63.0",
     "npm:@playwright/test@1.63.0": "1.63.0",
     "npm:@types/node@^26.1.1": "26.1.1",
     "npm:@vitejs/plugin-vue@~6.0.8": "6.0.8_vite@8.2.2__@types+node@26.1.1__sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.1.1_sass-embedded@1.104.0_typescript@7.0.2",
