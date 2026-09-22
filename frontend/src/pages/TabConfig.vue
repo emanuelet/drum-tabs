@@ -6,6 +6,7 @@ import Vue3Dropzone from "@jaxtheprime/vue3-dropzone";
 import { supportedAudioFormatCommaString, supportedAudioFormatList, supportedFormatCommaString, supportedFormatList } from "../../../backend/common.js";
 import SyncOptions from "../components/SyncOptions.vue";
 import { FontAwesomeIcon } from "../icon.ts";
+import { parseYoutubeVideoID } from "../youtube.ts";
 
 const alphaTab = await import("@coderline/alphatab");
 
@@ -93,19 +94,9 @@ export default defineComponent({
         },
         async addYoutube() {
             try {
-                // Validate URL
-                const url = this.youtubeURL;
-
-                const obj = new URL(url);
-
-                if (obj.hostname !== "www.youtube.com" && obj.hostname !== "music.youtube.com") {
-                    throw new Error("Invalid YouTube URL");
-                }
-
-                // Get ?v
-                const videoID = obj.searchParams.get("v");
+                const videoID = parseYoutubeVideoID(this.youtubeURL);
                 if (!videoID) {
-                    throw new Error("Invalid YouTube URL, no ?v= params?");
+                    throw new Error("Invalid YouTube URL. Please provide a valid YouTube link.");
                 }
 
                 // Send to api (/tab/:id/youtube)

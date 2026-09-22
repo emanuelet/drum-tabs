@@ -163,6 +163,32 @@ test("shows a long or short track name before its MIDI fallback", async ({ page 
     });
 });
 
+test("persists master and per-track volumes", async ({ page }) => {
+    await openTab(page);
+    await page.locator(".track-selector .button").click();
+
+    const masterVolume = page.locator(".track-list .master-volume input");
+    const trackVolumes = page.locator(".track-list .track .select-percentage input");
+    const trackCount = await trackVolumes.count();
+
+    await masterVolume.fill("44");
+    await expect(masterVolume).toHaveValue("44");
+    for (let index = 0; index < trackCount; index++) {
+        await expect(trackVolumes.nth(index)).toHaveValue("44");
+    }
+
+    await trackVolumes.first().fill("80");
+    await expect(trackVolumes.first()).toHaveValue("80");
+
+    await openTab(page);
+    await page.locator(".track-selector .button").click();
+    await expect(page.locator(".track-list .master-volume input")).toHaveValue("44");
+    await expect(page.locator(".track-list .track .select-percentage input").first()).toHaveValue("80");
+    for (let index = 1; index < trackCount; index++) {
+        await expect(page.locator(".track-list .track .select-percentage input").nth(index)).toHaveValue("44");
+    }
+});
+
 test("keeps one YouTube sync timer across buffering", async ({ page }) => {
     await installYoutubeStub(page);
     await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
