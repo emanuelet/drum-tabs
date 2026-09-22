@@ -1,6 +1,7 @@
 import * as fs from "@std/fs";
 import * as path from "@std/path";
 import * as z from "zod";
+import { db } from "./db.ts";
 import { dataDir } from "./util.ts";
 
 const ExerciseSchema = z.object({
@@ -18,7 +19,6 @@ const ExerciseListSchema = z.array(ExerciseSchema);
 export type Exercise = z.infer<typeof ExerciseSchema>;
 
 const exerciseFilePath = path.join(dataDir, "exercises.json");
-let writeQueue = Promise.resolve();
 
 const starterExercises: Exercise[] = [
     {
@@ -110,17 +110,56 @@ export function normalizeExerciseAlphaTex(alphaTex: string): string {
     }).join("\n");
 }
 
-async function writeExercises(exercises: Exercise[]): Promise<void> {
-    await Deno.writeTextFile(exerciseFilePath, JSON.stringify(exercises, null, 2) + "\n");
+function exerciseFromRow(row: Record<string, unknown>): Exercise {
+    return ExerciseSchema.parse({
+        id: row.id,
+        title: row.title,
+        subtitle: row.subtitle,
+        tempo: row.tempo,
+        alphaTex: row.alpha_tex,
+        fav: Boolean(row.is_fav),
+        createdAt: row.created_at,
+    });
 }
 
-async function ensureExerciseFile(): Promise<void> {
-    if (!await fs.exists(exerciseFilePath)) await writeExercises(starterExercises);
+async function initializeExerciseStore() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS exercise (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            subtitle TEXT NOT NULL DEFAULT '',
+            tempo INTEGER NOT NULL,
+            alpha_tex TEXT NOT NULL,
+            is_fav INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            position INTEGER NOT NULL
+        );
+    `);
+
+    const row = db.prepare("SELECT COUNT(*) AS count FROM exercise").get() as { count: number };
+    if (row.count > 0) return;
+
+    const exercises = await fs.exists(exerciseFilePath) ? ExerciseListSchema.parse(JSON.parse(await Deno.readTextFile(exerciseFilePath))) : starterExercises;
+    const insert = db.prepare(
+        "INSERT INTO exercise (id, title, subtitle, tempo, alpha_tex, is_fav, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    );
+    db.exec("BEGIN");
+    try {
+        exercises.forEach((exercise, position) => {
+            insert.run(exercise.id, exercise.title, exercise.subtitle, exercise.tempo, exercise.alphaTex, Number(exercise.fav), exercise.createdAt, position);
+        });
+        db.exec("COMMIT");
+    } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+    }
 }
+
+const exerciseStoreReady = initializeExerciseStore();
 
 export async function getAllExercises(): Promise<Exercise[]> {
-    await ensureExerciseFile();
-    return ExerciseListSchema.parse(JSON.parse(await Deno.readTextFile(exerciseFilePath)));
+    await exerciseStoreReady;
+    return db.prepare("SELECT id, title, subtitle, tempo, alpha_tex, is_fav, created_at FROM exercise ORDER BY position ASC").all().map((row) => exerciseFromRow(row as Record<string, unknown>));
 }
 
 export async function createExercise(alphaTex: string): Promise<Exercise> {
@@ -133,58 +172,40 @@ export async function createExercise(alphaTex: string): Promise<Exercise> {
         ...metadata,
     });
 
-    const write = writeQueue.then(async () => {
-        const exercises = await getAllExercises();
-        exercises.push(exercise);
-        await writeExercises(exercises);
-    });
-    writeQueue = write.catch(() => {});
-    await write;
+    await exerciseStoreReady;
+    db.prepare(
+        "INSERT INTO exercise (id, title, subtitle, tempo, alpha_tex, is_fav, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(position) + 1 FROM exercise), 0))",
+    ).run(exercise.id, exercise.title, exercise.subtitle, exercise.tempo, exercise.alphaTex, Number(exercise.fav), exercise.createdAt);
 
     return exercise;
 }
 
 export async function updateExerciseFav(id: string, fav: boolean): Promise<Exercise> {
-    let updatedExercise: Exercise | undefined;
-    const write = writeQueue.then(async () => {
-        const exercises = await getAllExercises();
-        const exercise = exercises.find((item) => item.id === id);
-        if (!exercise) throw new Error("Exercise not found");
-        exercise.fav = fav;
-        updatedExercise = exercise;
-        await writeExercises(exercises);
-    });
-    writeQueue = write.catch(() => {});
-    await write;
-
-    return updatedExercise!;
+    await exerciseStoreReady;
+    const result = db.prepare("UPDATE exercise SET is_fav = ? WHERE id = ?").run(Number(fav), id);
+    if (result.changes === 0) throw new Error("Exercise not found");
+    const row = db.prepare("SELECT id, title, subtitle, tempo, alpha_tex, is_fav, created_at FROM exercise WHERE id = ?").get(id);
+    return exerciseFromRow(row as Record<string, unknown>);
 }
 
 export async function updateExercise(id: string, alphaTex: string): Promise<Exercise> {
     const metadata = parseExerciseAlphaTex(alphaTex);
     const normalizedAlphaTex = normalizeExerciseAlphaTex(alphaTex);
-    let updatedExercise: Exercise | undefined;
-    const write = writeQueue.then(async () => {
-        const exercises = await getAllExercises();
-        const exercise = exercises.find((item) => item.id === id);
-        if (!exercise) throw new Error("Exercise not found");
-        Object.assign(exercise, metadata, { alphaTex: normalizedAlphaTex });
-        updatedExercise = exercise;
-        await writeExercises(exercises);
-    });
-    writeQueue = write.catch(() => {});
-    await write;
-
-    return updatedExercise!;
+    await exerciseStoreReady;
+    const result = db.prepare("UPDATE exercise SET title = ?, subtitle = ?, tempo = ?, alpha_tex = ? WHERE id = ?").run(
+        metadata.title,
+        metadata.subtitle,
+        metadata.tempo,
+        normalizedAlphaTex,
+        id,
+    );
+    if (result.changes === 0) throw new Error("Exercise not found");
+    const row = db.prepare("SELECT id, title, subtitle, tempo, alpha_tex, is_fav, created_at FROM exercise WHERE id = ?").get(id);
+    return exerciseFromRow(row as Record<string, unknown>);
 }
 
 export async function deleteExercise(id: string): Promise<void> {
-    const write = writeQueue.then(async () => {
-        const exercises = await getAllExercises();
-        const remainingExercises = exercises.filter((exercise) => exercise.id !== id);
-        if (remainingExercises.length === exercises.length) throw new Error("Exercise not found");
-        await writeExercises(remainingExercises);
-    });
-    writeQueue = write.catch(() => {});
-    await write;
+    await exerciseStoreReady;
+    const result = db.prepare("DELETE FROM exercise WHERE id = ?").run(id);
+    if (result.changes === 0) throw new Error("Exercise not found");
 }

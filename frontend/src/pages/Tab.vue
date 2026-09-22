@@ -17,6 +17,7 @@ const { ScrollMode, StaveProfile } = alphaTab;
 const speedActionBuffer = new ActionBuffer(1000);
 const syncOffsetYoutubeActionBuffer = new ActionBuffer(200);
 const syncOffsetAudioActionBuffer = new ActionBuffer(200);
+const externalPositionSyncMs = 100;
 
 export default defineComponent({
     components: { FontAwesomeIcon, BDropdownDivider, BDropdownItem, BDropdown, TextTabPlayer },
@@ -355,7 +356,17 @@ export default defineComponent({
         const urlParams = new URLSearchParams(window.location.search);
 
         try {
-            const metadata = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" }).then((res) => res.json());
+            const response = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" });
+            try {
+                await checkFetch(response);
+            } catch (e) {
+                if (e.message === "Not logged in") {
+                    this.$router.push("/login");
+                    return;
+                }
+                throw e;
+            }
+            const metadata = await response.json();
             if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
                 this.isTextTab = true;
                 return;
@@ -379,7 +390,7 @@ export default defineComponent({
             const trackID = this.getConfig("trackID", 0);
 
             // Load the AlphaTab
-            await this.load(trackID);
+            await this.load(trackID, metadata);
 
             window.addEventListener("keydown", this.keyEvents);
 
@@ -459,27 +470,30 @@ export default defineComponent({
             return `${(mark - 20) / 180 * 100}%`;
         },
 
-        async load(trackID) {
+        async load(trackID, metadata) {
             if (this.api) {
                 this.destroyContainer();
             }
 
-            const res = await fetch(baseURL + `/api/tab/${this.tabID}`, {
-                credentials: "include",
-            });
+            let data = metadata;
+            if (!data) {
+                const res = await fetch(baseURL + `/api/tab/${this.tabID}`, {
+                    credentials: "include",
+                });
 
-            try {
-                await checkFetch(res);
-            } catch (e) {
-                if (e.message === "Not logged in") {
-                    this.$router.push("/login");
-                    return;
-                } else {
-                    throw e;
+                try {
+                    await checkFetch(res);
+                } catch (e) {
+                    if (e.message === "Not logged in") {
+                        this.$router.push("/login");
+                        return;
+                    } else {
+                        throw e;
+                    }
                 }
-            }
 
-            const data = await res.json();
+                data = await res.json();
+            }
             if (data.tab) {
                 this.tab = data.tab;
                 this.youtubeList = data.youtubeList;
@@ -840,9 +854,9 @@ export default defineComponent({
         },
 
         destroyContainer() {
-            this.destroyYoutubePlayer();
             this.api?.destroy();
             this.api = undefined;
+            this.destroyYoutubePlayer();
 
             // Reset states
             this.ready = false;
@@ -1099,7 +1113,8 @@ export default defineComponent({
                     window.clearInterval(updateTimer);
                     this.playing = true;
                     this.api?.play();
-                    updateTimer = window.setInterval(onTimeUpdate, 50);
+                    onTimeUpdate();
+                    updateTimer = window.setInterval(onTimeUpdate, externalPositionSyncMs);
                 });
 
                 // state updates
@@ -1312,7 +1327,7 @@ export default defineComponent({
                 height: "180",
                 width: "320",
                 //videoId: videoID,
-                playerVars: { "autoplay": 0 }, // we do not want autoplay
+                playerVars: { "autoplay": 0, "controls": 0 }, // Playback is controlled by the app.
                 events: {
                     "onReady": (e) => {
                         youtubePlayerReady.resolve();
@@ -1324,9 +1339,11 @@ export default defineComponent({
                         switch (e.data) {
                             case YT.PlayerState.PLAYING:
                                 this.stopYoutubeSync();
-                                this.youtubeSyncTimer = window.setInterval(() => {
+                                const syncPosition = () => {
                                     this.api?.player?.output?.updatePosition?.(player.getCurrentTime() * 1000);
-                                }, 50);
+                                };
+                                syncPosition();
+                                this.youtubeSyncTimer = window.setInterval(syncPosition, externalPositionSyncMs);
                                 this.playing = true;
                                 applyInitialSeek();
                                 break;

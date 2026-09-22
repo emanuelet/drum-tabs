@@ -1,16 +1,16 @@
 // deno-lint-ignore-file no-explicit-any no-window no-window-prefix -- browser-context test helpers mimic YouTube's untyped iframe API.
 import { expect, type Page, test } from "@playwright/test";
-import { AUDIO_FILENAME, openTab, waitForDemoTab, YOUTUBE_VIDEO_ID } from "./helpers.ts";
+import { AUDIO_FILENAME, openTab, TAB_ID, waitForDemoTab, YOUTUBE_VIDEO_ID } from "./helpers.ts";
 
 async function installYoutubeStub(page: Page) {
     await page.addInitScript(() => {
-        const activeIntervals = new Set<number>();
+        const activeIntervals = new Map<number, number>();
         const setInterval = window.setInterval.bind(window);
         const clearInterval = window.clearInterval.bind(window);
 
         window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: any[]) => {
             const id = setInterval(handler, timeout, ...args) as unknown as number;
-            activeIntervals.add(id);
+            activeIntervals.set(id, timeout ?? 0);
             return id;
         }) as typeof window.setInterval;
         window.clearInterval = ((id?: number) => {
@@ -23,6 +23,7 @@ async function installYoutubeStub(page: Page) {
             state = 5;
             currentTime = 0;
             seeks: number[] = [];
+            destroyed = false;
 
             constructor(_element: Element, config: any) {
                 this.config = config;
@@ -48,7 +49,13 @@ async function installYoutubeStub(page: Page) {
             }
 
             destroy() {
+                this.destroyed = true;
                 (window as any).__youtubeTest.destroyed++;
+            }
+
+            pauseVideo() {
+                if (this.destroyed) throw new Error("YouTube player was used after destroy");
+                this.emit((window as any).YT.PlayerState.PAUSED);
             }
 
             getCurrentTime() {
@@ -91,6 +98,17 @@ async function installYoutubeStub(page: Page) {
 
 test.beforeEach(async ({ request }) => {
     await waitForDemoTab(request);
+});
+
+test("loads tab metadata once during initial player setup", async ({ page }) => {
+    let metadataRequests = 0;
+    await page.route(`**/api/tab/${TAB_ID}`, async (route) => {
+        metadataRequests++;
+        await route.continue();
+    });
+
+    await openTab(page);
+    expect(metadataRequests).toBe(1);
 });
 
 test("keeps advanced sync points after loading an audio source", async ({ page }) => {
@@ -153,6 +171,7 @@ test("keeps one YouTube sync timer across buffering", async ({ page }) => {
     const baseline = await page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size);
     await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.PLAYING));
     await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline + 1);
+    expect(await page.evaluate(() => [...(window as any).__youtubeTest.activeIntervals.values()])).toContain(100);
 
     await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.BUFFERING));
     await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline);
@@ -173,6 +192,18 @@ test("disposes YouTube when switching sources", async ({ page }) => {
     await page.locator(".audio-list .audio.item", { hasText: "Synth" }).click();
 
     await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.destroyed)).toBe(1);
+});
+
+test("allows AlphaTab to stop before its YouTube player is destroyed", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    await page.evaluate(() => (window as any).api.destroy());
+
+    expect(errors).toEqual([]);
 });
 
 test("applies deferred YouTube seeks after cueing", async ({ page }) => {

@@ -25,7 +25,7 @@ Deno.test("exercise storage seeds the built-in presets", async () => {
     assertEquals(exercises.length, 3);
     assertEquals(exercises[0].title, "Quarter-note pulse");
     assertEquals(exercises.every((exercise) => exercise.fav), true);
-    assertEquals(await fs.exists(path.join(tempDir, "exercises.json")), true);
+    assertEquals(await fs.exists(path.join(tempDir, "config.db")), true);
 });
 
 Deno.test("updateExerciseFav persists favorite status", async () => {

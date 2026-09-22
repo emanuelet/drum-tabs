@@ -129,6 +129,13 @@ async function moveObject(bucket: R2Bucket, from: string, to: string) {
     await bucket.delete(from);
 }
 
+async function moveObjects(bucket: R2Bucket, keys: string[], destination: (key: string) => string) {
+    const concurrency = 8;
+    for (let index = 0; index < keys.length; index += concurrency) {
+        await Promise.all(keys.slice(index, index + concurrency).map((key) => moveObject(bucket, key, destination(key))));
+    }
+}
+
 const app = new Hono<AppEnv>();
 
 type CloudDependencies = TeachingRouteDependencies &
@@ -1019,8 +1026,7 @@ app.delete("/api/tab/:id", async (c) => {
             tab.object_key,
             ...audio.results.map((item) => item.object_key),
         ];
-        for (const key of keys)
-            await moveObject(c.env.TABS_BUCKET, key, `deleted/${key}`);
+        await moveObjects(c.env.TABS_BUCKET, keys, (key) => `deleted/${key}`);
         await c.env.DB.prepare("UPDATE tab SET deleted_at = ? WHERE id = ?")
             .bind(new Date().toISOString(), tab.id)
             .run();
@@ -1042,11 +1048,11 @@ app.post("/api/tab/:id/restore", async (c) => {
         )
             .bind(tab.id)
             .all<{ object_key: string }>();
-        for (const key of [
+        const keys = [
             tab.object_key,
             ...audio.results.map((item) => item.object_key),
-        ])
-            await moveObject(c.env.TABS_BUCKET, `deleted/${key}`, key);
+        ];
+        await moveObjects(c.env.TABS_BUCKET, keys, (key) => key);
         await c.env.DB.prepare("UPDATE tab SET deleted_at = NULL WHERE id = ?")
             .bind(tab.id)
             .run();

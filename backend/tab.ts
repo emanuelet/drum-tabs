@@ -7,6 +7,7 @@ import sanitize from "sanitize-filename";
 import { supportedAudioFormatList, supportedFormatList } from "./common.ts";
 
 const updateQueues = new Map<string, Promise<ConfigJSON>>();
+const tabListConcurrency = 8;
 
 /**
  * Get the config.json path for a tab
@@ -111,7 +112,7 @@ async function writeConfigJSON(id: string, config: ConfigJSON): Promise<void> {
 }
 
 export async function getAllTabs(): Promise<TabInfo[]> {
-    const tabs: TabInfo[] = [];
+    const ids: string[] = [];
 
     // Scan the tabs folder
     for await (const entry of Deno.readDir(tabDir)) {
@@ -120,12 +121,13 @@ export async function getAllTabs(): Promise<TabInfo[]> {
             continue;
         }
 
-        const id = entry.name;
-        const tab = await getOrCreateTab(id);
+        ids.push(entry.name);
+    }
 
-        if (tab) {
-            tabs.push(tab);
-        }
+    const tabs: TabInfo[] = [];
+    for (let index = 0; index < ids.length; index += tabListConcurrency) {
+        const batch = await Promise.all(ids.slice(index, index + tabListConcurrency).map((id) => getOrCreateTab(id)));
+        tabs.push(...batch.filter((tab): tab is TabInfo => tab !== null));
     }
 
     // Sort by createdAt (newest first)

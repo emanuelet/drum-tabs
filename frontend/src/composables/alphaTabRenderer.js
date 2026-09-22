@@ -15,7 +15,7 @@ export function overrideHiddenStaves(score, scoreStyle) {
 }
 
 export function applyScoreColors(score, setting, alphaTab) {
-    let stringColors = {
+    const stringColors = {
         1: alphaTab.model.Color.fromJson("#bf3732"),
         2: alphaTab.model.Color.fromJson("#fff800"),
         3: alphaTab.model.Color.fromJson("#0080ff"),
@@ -24,11 +24,14 @@ export function applyScoreColors(score, setting, alphaTab) {
         6: alphaTab.model.Color.fromJson("#A349A4"),
     };
     if (setting.scoreColor === "light") stringColors[2] = alphaTab.model.Color.fromJson("#b5a33a");
+    let bassColors;
+    let tupletColor;
 
     for (const track of score.tracks) {
         for (const staff of track.staves) {
-            if (setting.noteColor === "louis-bass-v" && staff.stringTuning.tunings.length === 5) {
-                stringColors = {
+            const usesBassColors = setting.noteColor === "louis-bass-v" && staff.stringTuning.tunings.length === 5;
+            if (usesBassColors && !bassColors) {
+                bassColors = {
                     1: alphaTab.model.Color.fromJson("#b1da68"),
                     2: alphaTab.model.Color.fromJson("#bf3732"),
                     3: alphaTab.model.Color.fromJson("#fff800"),
@@ -36,19 +39,20 @@ export function applyScoreColors(score, setting, alphaTab) {
                     5: alphaTab.model.Color.fromJson("#e07b39"),
                 };
             }
+            const colors = usesBassColors ? bassColors : stringColors;
             for (const bar of staff.bars) {
                 for (const voice of bar.voices) {
                     for (const beat of voice.beats) {
                         if (beat.hasTuplet) {
+                            tupletColor ??= alphaTab.model.Color.fromJson("#00DD00");
                             beat.style = new alphaTab.model.BeatStyle();
-                            const color = alphaTab.model.Color.fromJson("#00DD00");
-                            beat.style.colors.set(alphaTab.model.BeatSubElement.StandardNotationTuplet, color);
-                            beat.style.colors.set(alphaTab.model.BeatSubElement.StandardNotationBeams, color);
+                            beat.style.colors.set(alphaTab.model.BeatSubElement.StandardNotationTuplet, tupletColor);
+                            beat.style.colors.set(alphaTab.model.BeatSubElement.StandardNotationBeams, tupletColor);
                         }
                         if (setting.noteColor !== "none") {
                             for (const note of beat.notes) {
                                 note.style = new alphaTab.model.NoteStyle();
-                                note.style.colors.set(alphaTab.model.NoteSubElement.GuitarTabFretNumber, stringColors[note.string]);
+                                note.style.colors.set(alphaTab.model.NoteSubElement.GuitarTabFretNumber, colors[note.string]);
                             }
                         }
                     }
