@@ -584,7 +584,7 @@ export default defineComponent({
             <p>
                 If you can access the file system, you can edit/replace the tab directly, the path is:<br />
                 <strong v-if="showOpenButtons">{{ filePath }}</strong>
-                <a v-else :href="`${baseURL}/api/tab/${tabID}/file`" :download="tab.originalFilename">{{ tab.originalFilename }}</a>
+                <a v-else :href="`${baseURL}/api/tab/${tabID}/file`" :download="tab.originalFilename">{{ filePath }}</a>
             </p>
 
             <h2 class="mt-4 mb-4">Method 2: Upload and replace the tab file</h2>

@@ -2573,6 +2573,7 @@ $padding: 20px;
 
     .volume-boost-switch {
         position: relative;
+        display: inline-block;
         width: 36px;
         height: 20px;
 
@@ -2588,7 +2589,7 @@ $padding: 20px;
                 background-color: $primary;
 
                 &::after {
-                    transform: translateX(16px);
+                    transform: translate(16px, 10%);
                 }
             }
 

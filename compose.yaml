@@ -1,6 +1,6 @@
 services:
     app:
-        image: louislam/its-mytabs:1
+        image: emanuelet/drumtabs:1.9.0
         ports:
             # Host Port:Container Port
             - "47777:47777"

@@ -13,13 +13,13 @@ Drum Tabs is an open source, web based, self-hostable guitar, bass, and drum tab
 
 Drum Tabs is a drum-focused fork of [It's MyTabs](https://github.com/louislam/its-mytabs) by [Louis Lam](https://github.com/louislam).
 
-<img width="1440" height="900" alt="Screenshot 2026-08-03 at 11-33-41 Drum Tabs" src="https://github.com/user-attachments/assets/320129ca-33d1-4be4-8227-9d9af002cead" />
+![Drum Tabs player](docs/screenshots/player.png)
 
-<img width="1440" height="900" alt="exercises" src="https://github.com/user-attachments/assets/a3619c5e-22fe-4c61-a5ed-735591ffd385" />
+![Drum Tabs mixer](docs/screenshots/mixer.png)
 
 ## Live Demo
 
-https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
+https://drum-tabs.emanuele-tonello.workers.dev/tab/1270153f-9184-461a-be21-0037bfdd1bbd
 
 ## Features
 
@@ -62,7 +62,7 @@ Download the [compose.yaml]() file and put it in an empty folder.
 ```yaml
 services:
     app:
-        image: emanuelet/drumtabs:1
+        image: emanuelet/drumtabs:1.9.0
         ports:
             # Host Port:Container Port
             - "47777:47777"
@@ -88,13 +88,7 @@ Run a local stdio MCP server for agents that need full control of this tab libra
 DATA_DIR=./data deno task mcp
 ```
 
-It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP
-client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
-
-## Cloudflare Deployment
-
-Cloudflare deployment is optional and independent from the local Deno library. It uses Workers, D1, and R2; local MCP data is not kept in sync. Setup and one-time import instructions are in
-[`cloud/README.md`](cloud/README.md).
+It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
 
 Configure a local MCP client to start it from this repository:
 
@@ -111,10 +105,15 @@ Configure a local MCP client to start it from this repository:
 }
 ```
 
+## Cloudflare Deployment
+
+Cloudflare deployment is optional and independent from the local Deno library. It uses Workers, D1, and R2; local MCP data is not kept in sync. Setup and one-time import instructions are in
+[`cloud/README.md`](cloud/README.md).
+
 ### Docker
 
 ```bash
-docker run -d --name drumtabs -p 47777:47777 -v drumtabs:/app/data --restart unless-stopped emanuelet/drumtabs:1
+docker run -d --name drumtabs -p 47777:47777 -v drumtabs:/app/data --restart unless-stopped emanuelet/drumtabs:1.9.0
 ```
 
 Go to `http://localhost:47777` to access the web UI.
@@ -140,13 +139,7 @@ Go to `http://localhost:47777` to access the web UI.
 
 ## Screenshots
 
-<img width="300"  alt="image" src="https://github.com/user-attachments/assets/266c6c5a-ae86-4b88-8305-3ae120cf4dd8" />
-
-<img width="300"  alt="image" src="https://github.com/user-attachments/assets/a57293a4-5399-4a76-a14d-da026d0c4a7a" />
-
-<img width="300" alt="image" src="https://github.com/user-attachments/assets/972aa28a-1235-465a-be47-ed2bc9bb3035" />
-
-<img width="300" alt="image" src="https://github.com/user-attachments/assets/a617af33-ba33-4022-b9d2-6fe96e11e85d" />
+![Drum Tabs settings](docs/screenshots/settings.png)
 
 ## Environment Variables
 
