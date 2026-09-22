@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any no-window no-window-prefix -- browser-context test helpers mimic YouTube's untyped iframe API.
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { AUDIO_FILENAME, openTab, TAB_ID, waitForDemoTab, YOUTUBE_VIDEO_ID } from "./helpers.ts";
 
 async function installYoutubeStub(page: Page) {
@@ -22,6 +22,7 @@ async function installYoutubeStub(page: Page) {
             config: any;
             state = 5;
             currentTime = 0;
+            volume = 100;
             seeks: number[] = [];
             destroyed = false;
 
@@ -77,10 +78,12 @@ async function installYoutubeStub(page: Page) {
             setPlaybackRate() {}
 
             getVolume() {
-                return 100;
+                return this.volume;
             }
 
-            setVolume() {}
+            setVolume(volume: number) {
+                this.volume = volume;
+            }
 
             seekTo(time: number) {
                 this.currentTime = time;
@@ -94,6 +97,13 @@ async function installYoutubeStub(page: Page) {
             PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
         };
     });
+}
+
+async function setRangeValue(locator: Locator, value: string) {
+    await locator.evaluate((input, newValue) => {
+        (input as HTMLInputElement).value = newValue;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
 }
 
 test.beforeEach(async ({ request }) => {
@@ -163,6 +173,16 @@ test("shows a long or short track name before its MIDI fallback", async ({ page 
     });
 });
 
+test("formats BPM with two decimal places", async ({ page }) => {
+    await openTab(page);
+    await page.getByRole("button", { name: /Speed:/ }).click();
+
+    const bpmInput = page.getByRole("spinbutton", { name: "BPM" });
+    await bpmInput.fill("96.127");
+    await bpmInput.press("Tab");
+    await expect(bpmInput).toHaveValue("96.13");
+});
+
 test("persists master and per-track volumes", async ({ page }) => {
     await openTab(page);
     await page.locator(".track-selector .button").click();
@@ -170,18 +190,32 @@ test("persists master and per-track volumes", async ({ page }) => {
     const masterVolume = page.locator(".track-list .master-volume input");
     const trackVolumes = page.locator(".track-list .track .select-percentage input");
     const trackCount = await trackVolumes.count();
+    const volumeBoost = page.getByLabel("Allow volume boost");
+    await expect(volumeBoost).not.toBeChecked();
+    await expect(masterVolume).toHaveAttribute("max", "100");
+    await expect(trackVolumes.first()).toHaveAttribute("max", "100");
+    await expect(masterVolume).not.toHaveClass(/boost-enabled/);
+    await volumeBoost.check();
+    await expect(masterVolume).toHaveAttribute("max", "200");
+    await expect(trackVolumes.first()).toHaveAttribute("max", "200");
+    await expect(masterVolume).toHaveClass(/boost-enabled/);
 
-    await masterVolume.fill("44");
+    await setRangeValue(masterVolume, "44");
     await expect(masterVolume).toHaveValue("44");
     for (let index = 0; index < trackCount; index++) {
         await expect(trackVolumes.nth(index)).toHaveValue("44");
     }
 
-    await trackVolumes.first().fill("80");
+    await setRangeValue(trackVolumes.first(), "80");
     await expect(trackVolumes.first()).toHaveValue("80");
+    await page.locator(".track-list .mute").first().click();
+    await expect(trackVolumes.first()).toBeDisabled();
+    await page.locator(".track-list .mute").first().click();
+    await expect(trackVolumes.first()).toBeEnabled();
 
     await openTab(page);
     await page.locator(".track-selector .button").click();
+    await expect(page.getByLabel("Allow volume boost")).toBeChecked();
     await expect(page.locator(".track-list .master-volume input")).toHaveValue("44");
     await expect(page.locator(".track-list .track .select-percentage input").first()).toHaveValue("80");
     for (let index = 1; index < trackCount; index++) {
@@ -189,10 +223,43 @@ test("persists master and per-track volumes", async ({ page }) => {
     }
 });
 
+test("uses master volume for YouTube and disables track mixing", async ({ page }) => {
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+    await page.locator(".track-selector .button").click();
+
+    const masterVolume = page.locator(".track-list .master-volume input");
+    const trackVolumes = page.locator(".track-list .track .select-percentage input");
+    await expect(masterVolume).toHaveValue("100");
+    await expect(trackVolumes.first()).toBeDisabled();
+    await expect(page.locator(".track-list .solo").first()).toBeDisabled();
+    await expect(page.locator(".track-list .mute").first()).toBeDisabled();
+
+    await setRangeValue(masterVolume, "44");
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.players[0].volume)).toBe(44);
+});
+
+test("reenables track controls after switching from YouTube to Synth", async ({ page }) => {
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    await page.locator(".audio-selector .button").click();
+    await page.locator(".audio-list .audio.item", { hasText: "Synth" }).click();
+    await page.locator(".track-selector .button").click();
+
+    await expect(page.locator(".track-list .track .select-percentage input").first()).toBeEnabled();
+    await expect(page.locator(".track-list .solo").first()).toBeEnabled();
+    await expect(page.locator(".track-list .mute").first()).toBeEnabled();
+});
+
 test("keeps one YouTube sync timer across buffering", async ({ page }) => {
     await installYoutubeStub(page);
     await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
     await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+    // AlphaTab may cue the new player after its constructor runs.
+    await page.waitForTimeout(100);
 
     const baseline = await page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size);
     await page.evaluate(() => (window as any).__youtubeTest.players[0].emit((window as any).YT.PlayerState.PLAYING));
@@ -209,6 +276,80 @@ test("keeps one YouTube sync timer across buffering", async ({ page }) => {
     await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.activeIntervals.size)).toBe(baseline + 1);
 });
 
+test("edits advanced YouTube sync points from the player", async ({ page }) => {
+    await installYoutubeStub(page);
+    await page.route("**/api/auth/get-session", async (route) => {
+        await route.fulfill({ json: { session: { id: "e2e-session" }, user: { id: "e2e-user" } } });
+    });
+    await page.route(`**/api/tab/${TAB_ID}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const youtube = body.youtubeList.find((item: { videoID: string }) => item.videoID === YOUTUBE_VIDEO_ID);
+        youtube.syncMethod = "advanced";
+        youtube.simpleSync = 0;
+        youtube.advancedSync = "\\sync 0 0 0";
+        await route.fulfill({ response, json: body });
+    });
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    const player = page.locator(".youtube-player");
+    await expect(player.getByRole("button", { name: "Fix Audio Sync" })).toBeVisible();
+    await page.evaluate(() => (window as any).__youtubeTest.players[0].currentTime = 12.345);
+    await player.getByRole("button", { name: "Fix Audio Sync" }).click();
+    await expect(player.getByRole("button", { name: "Close audio sync editor" })).toBeVisible();
+    await expect(player.getByRole("button", { name: "Fix Audio Sync" })).toBeHidden();
+    await expect(player.locator(".youtube-sync-point-marker")).toHaveCount(1);
+    await expect(page.locator(".youtube-sync-tab-marker")).toHaveCount(1);
+
+    await player.getByRole("button", { name: "Bar 1: 0.000s" }).click();
+    await expect(player.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+    await expect(player.getByRole("button", { name: "Delete", exact: true })).toBeVisible();
+    await expect(page.locator(".youtube-sync-tab-marker.selected")).toHaveCount(1);
+
+    await page.evaluate(() => {
+        const beat = (window as any).api.score.tracks[0].staves[0].bars[5].voices[0].beats[0];
+        (window as any).api.beatMouseDown.trigger(beat);
+    });
+
+    const inputs = player.locator(".youtube-sync-fields input");
+    await expect(inputs.nth(0)).toHaveValue("6");
+    await expect(inputs.nth(1)).toHaveValue("12.345");
+    await expect(player.getByRole("button", { name: "Add", exact: true })).toBeVisible();
+
+    await inputs.nth(0).fill("5");
+    await inputs.nth(1).fill("12.5");
+    await player.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByText("Added sync point for bar 5.")).toBeVisible();
+    await expect(player.locator(".youtube-sync-point-marker")).toHaveCount(2);
+    await expect(page.locator(".youtube-sync-tab-marker")).toHaveCount(2);
+    await expect(page.locator(".youtube-sync-tab-marker.selected")).toHaveCount(1);
+
+    await inputs.nth(1).fill("13");
+    await player.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByText("Updated sync point for bar 5.")).toBeVisible();
+
+    await player.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByText("Deleted sync point for bar 5.")).toBeVisible();
+    await expect(player.getByRole("button", { name: "Add", exact: true })).toBeVisible();
+    await expect(page.locator(".youtube-sync-tab-marker")).toHaveCount(1);
+
+    let savedSync: string | undefined;
+    await page.route(`**/api/tab/${TAB_ID}/youtube/${YOUTUBE_VIDEO_ID}`, async (route) => {
+        if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+        }
+        savedSync = route.request().postDataJSON().advancedSync;
+        await route.fulfill({ json: {} });
+    });
+    await player.getByRole("button", { name: "Save Sync" }).click();
+    await expect.poll(() => savedSync).toBe("\\sync 0 0 0");
+    await expect(page.getByText("Audio sync saved.")).toBeVisible();
+    await expect(player.getByRole("button", { name: "Fix Audio Sync" })).toBeVisible();
+    await expect(player.getByRole("button", { name: "Close audio sync editor" })).toBeHidden();
+});
+
 test("disposes YouTube when switching sources", async ({ page }) => {
     await installYoutubeStub(page);
     await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
@@ -218,6 +359,22 @@ test("disposes YouTube when switching sources", async ({ page }) => {
     await page.locator(".audio-list .audio.item", { hasText: "Synth" }).click();
 
     await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.destroyed)).toBe(1);
+});
+
+test("switches from playing YouTube to Synth without using a destroyed player", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await installYoutubeStub(page);
+    await openTab(page, `youtube-${YOUTUBE_VIDEO_ID}`);
+    await page.waitForFunction(() => (window as any).__youtubeTest.players.length === 1);
+
+    await page.getByRole("button", { name: "Play" }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.players[0].state)).toBe(1);
+    await page.locator(".audio-selector .button").click();
+    await page.locator(".audio-list .audio.item", { hasText: "Synth" }).click();
+
+    await expect.poll(() => page.evaluate(() => (window as any).__youtubeTest.destroyed)).toBe(1);
+    expect(errors).toEqual([]);
 });
 
 test("allows AlphaTab to stop before its YouTube player is destroyed", async ({ page }) => {

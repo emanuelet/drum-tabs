@@ -275,13 +275,14 @@ export default defineComponent({
         </section>
         <section class="ultimate-guitar mt-5">
             <h2>Ultimate Guitar</h2>
-            <p class="text-secondary">Configure the Cookie header in <router-link :to="{ name: 'settings' }">Settings</router-link>. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
+            <p
+                class="text-secondary">Configure the Cookie header in <router-link :to="{ name: 'settings' }">Settings</router-link>. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
             <div class="d-flex gap-2 mb-3">
                 <input v-model="ugQuery" class="form-control" placeholder="Artist or song" @keyup.enter="searchUltimateGuitar" />
-                <select v-model="ugMode" class="form-select">
-                    <option value="guitar-pro">Guitar Pro with drums</option>
-                    <option value="ascii-drums">ASCII drum tabs</option>
-                </select>
+                <div class="btn-group" role="group" aria-label="Ultimate Guitar import mode">
+                    <button type="button" class="btn" :class="ugMode === 'guitar-pro' ? 'btn-primary' : 'btn-outline-secondary'" @click="ugMode = 'guitar-pro'">Guitar Pro with drums</button>
+                    <button type="button" class="btn" :class="ugMode === 'ascii-drums' ? 'btn-primary' : 'btn-outline-secondary'" @click="ugMode = 'ascii-drums'">ASCII drum tabs</button>
+                </div>
                 <button class="btn btn-primary" :disabled="ugLoading" @click="searchUltimateGuitar">{{ ugLoading ? "Searching..." : "Search" }}</button>
             </div>
             <div v-if="ugError" class="alert alert-danger">{{ ugError }}</div>

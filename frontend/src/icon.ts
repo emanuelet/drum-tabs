@@ -20,6 +20,7 @@ import {
     faFolder,
     faGaugeHigh,
     faGear,
+    faHeadphones,
     faListOl,
     faMagnifyingGlass,
     faMagnifyingGlassMinus,
@@ -35,6 +36,7 @@ import {
     faStopwatch,
     faTrashCan,
     faVolumeHigh,
+    faVolumeXmark,
     faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
@@ -43,6 +45,7 @@ library.add([
     faFile,
     faFolder,
     faGear,
+    faHeadphones,
     faArrowRightFromBracket,
     faCaretDown,
     faPlus,
@@ -70,6 +73,7 @@ library.add([
     faRotateLeft,
     faStopwatch,
     faVolumeHigh,
+    faVolumeXmark,
 ]);
 
 export { FontAwesomeIcon };

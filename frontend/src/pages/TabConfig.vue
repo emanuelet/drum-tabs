@@ -34,6 +34,15 @@ export default defineComponent({
             showOpenButtons: false,
         };
     },
+    computed: {
+        selectedYoutubeVideo() {
+            const videoID = parseYoutubeVideoID(this.youtubeURL);
+            return videoID ? this.youtubeList.find((video) => video.videoID === videoID) : null;
+        },
+        canUseYoutube() {
+            return Boolean(this.youtubeURL.trim()) && !this.selectedYoutubeVideo;
+        },
+    },
     async mounted() {
         this.tabID = this.$route.params.id;
         this.page = this.$route.path.split("/").pop();
@@ -114,8 +123,6 @@ export default defineComponent({
                 });
 
                 await checkFetch(res);
-                this.youtubeURL = "";
-
                 await this.load();
             } catch (e) {
                 generalError(e);
@@ -173,6 +180,7 @@ export default defineComponent({
                 if (!confirm("Are you sure you want to remove this YouTube video?")) {
                     return;
                 }
+                const wasSelected = this.selectedYoutubeVideo?.videoID === video.videoID;
 
                 const tabID = this.tab.id;
 
@@ -189,6 +197,9 @@ export default defineComponent({
                 });
 
                 await this.load();
+                if (wasSelected) {
+                    this.youtubeURL = "";
+                }
             } catch (e) {
                 generalError(e);
             }
@@ -430,13 +441,13 @@ export default defineComponent({
                     <input type="text" class="form-control" id="tabArtist" v-model="tab.artist">
                 </div>
 
-                <!-- Public (Dropdown) -->
+                <!-- Public -->
                 <div class="mb-3">
-                    <label for="tabPublic" class="form-label">Share to public</label>
-                    <select class="form-control" id="tabPublic" v-model="tab.public">
-                        <option :value="false">Private</option>
-                        <option :value="true">Public</option>
-                    </select>
+                    <span class="form-label d-block">Share to public</span>
+                    <div class="btn-group" role="group" aria-label="Share to public">
+                        <button type="button" class="btn" :class="!tab.public ? 'btn-primary' : 'btn-outline-secondary'" @click="tab.public = false">Private</button>
+                        <button type="button" class="btn" :class="tab.public ? 'btn-primary' : 'btn-outline-secondary'" @click="tab.public = true">Public</button>
+                    </div>
                 </div>
 
                 <!-- Save -->
@@ -457,7 +468,10 @@ export default defineComponent({
                 <label for="basic-url" class="form-label">Youtube URL</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="basic-url" placeholder="" v-model="youtubeURL">
-                    <button class="btn btn-primary" type="button" @click.prevent="addYoutube()">Add</button>
+                    <a v-if="selectedYoutubeVideo" class="btn btn-outline-secondary" :href="youtubeURL" target="_blank" rel="noopener" aria-label="Open selected YouTube video">
+                        <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
+                    </a>
+                    <button class="btn btn-primary" type="button" :disabled="!canUseYoutube" @click.prevent="addYoutube()">Use</button>
                 </div>
             </div>
 
@@ -499,11 +513,8 @@ export default defineComponent({
                             @update:advancedSync="video.advancedSync = $event"
                         />
 
-                        <button class="btn btn-primary" @click.prevent="saveYoutube(video)">Save</button>
-                    </div>
-
-                    <div class="buttons">
                         <div class="btn-group">
+                            <button class="btn btn-primary" @click.prevent="saveYoutube(video)">Save</button>
                             <button class="btn btn-danger" @click="removeYoutube(video)">Remove</button>
                         </div>
                     </div>
@@ -572,7 +583,8 @@ export default defineComponent({
             <h2 class="mt-4 mb-4">Method 1: Direct Edit</h2>
             <p>
                 If you can access the file system, you can edit/replace the tab directly, the path is:<br />
-                <strong>{{ filePath }}</strong>
+                <strong v-if="showOpenButtons">{{ filePath }}</strong>
+                <a v-else :href="`${baseURL}/api/tab/${tabID}/file`" :download="tab.originalFilename">{{ tab.originalFilename }}</a>
             </p>
 
             <h2 class="mt-4 mb-4">Method 2: Upload and replace the tab file</h2>

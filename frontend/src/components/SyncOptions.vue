@@ -51,10 +51,10 @@ export default defineComponent({
 
 <template>
     <div>
-        <select class="form-control mb-3" v-model="syncMethodInternal">
-            <option value="simple">Simple Sync</option>
-            <option value="advanced">Advanced Sync</option>
-        </select>
+        <div class="btn-group mb-3" role="group" aria-label="Sync method">
+            <button type="button" class="btn" :class="syncMethodInternal === 'simple' ? 'btn-primary' : 'btn-outline-secondary'" @click="syncMethodInternal = 'simple'">Simple Sync</button>
+            <button type="button" class="btn" :class="syncMethodInternal === 'advanced' ? 'btn-primary' : 'btn-outline-secondary'" @click="syncMethodInternal = 'advanced'">Advanced Sync</button>
+        </div>
 
         <div v-if='syncMethodInternal === "simple"' class="mb-3">
             1st Bar Start Point (start at {{ simpleSyncSecond }} second)

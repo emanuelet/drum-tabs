@@ -80,7 +80,8 @@ export default defineComponent({
                     <label for="repeat">Repeat PIN</label>
                 </div>
 
-                <div class="mt-3"><label for="role" class="form-label">I am a</label><select id="role" v-model="role" class="form-select"><option value="learner">Learner</option><option value="teacher">Teacher</option></select></div>
+                <div
+                    class="mt-3"><span class="form-label d-block">I am a</span><div class="btn-group" role="group" aria-label="Role"><button type="button" class="btn" :class="role === 'learner' ? 'btn-primary' : 'btn-outline-secondary'" @click="role = 'learner'">Learner</button><button type="button" class="btn" :class="role === 'teacher' ? 'btn-primary' : 'btn-outline-secondary'" @click="role = 'teacher'">Teacher</button></div></div>
 
                 <button class="w-100 btn btn-primary mt-3" type="submit" :disabled="processing">
                     {{ $t("Create") }}

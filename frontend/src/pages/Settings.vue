@@ -146,11 +146,11 @@ export default defineComponent({
 
         <!-- Score Color Dropdown -->
         <div class="mb-3">
-            <label for="scoreColor" class="form-label">Tab/Score Color</label>
-            <select id="scoreColor" class="form-select" v-model="setting.scoreColor">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
+            <span class="form-label d-block">Tab/Score Color</span>
+            <div class="btn-group" role="group" aria-label="Tab and score color">
+                <button type="button" class="btn" :class="setting.scoreColor === 'light' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.scoreColor = 'light'">Light</button>
+                <button type="button" class="btn" :class="setting.scoreColor === 'dark' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.scoreColor = 'dark'">Dark</button>
+            </div>
         </div>
 
         <!-- Tab/Score Display Scale -->
@@ -171,45 +171,49 @@ export default defineComponent({
 
         <!-- Scroll Mode -->
         <div class="mb-3">
-            <label for="scrollMode" class="form-label">
+            <span class="form-label d-block">
                 Scroll
                 <span v-if='setting.scoreStyle === "horizontal-tab"'> (Force Smooth Scroll for Horizontal Tab)</span>
-            </label>
-            <select id="scrollMode" class="form-select" v-model="setting.scrollMode" :disabled='setting.scoreStyle === "horizontal-tab"'>
-                <option :value="ScrollMode.Continuous">Scroll</option>
-                <option :value="ScrollMode.Off">Off</option>
-                <option :value="ScrollMode.Smooth">Smooth Scroll</option>
-            </select>
+            </span>
+            <div class="btn-group" role="group" aria-label="Scroll mode">
+                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Continuous ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
+                    @click="setting.scrollMode = ScrollMode.Continuous">Scroll</button>
+                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Off ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
+                    @click="setting.scrollMode = ScrollMode.Off">Off</button>
+                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Smooth ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
+                    @click="setting.scrollMode = ScrollMode.Smooth">Smooth Scroll</button>
+            </div>
         </div>
 
         <!-- Show Key Signature -->
         <div class="mb-3">
-            <label for="showKeySignature" class="form-label">Show Key Signature</label>
-            <select id="showKeySignature" class="form-select" v-model="setting.showKeySignature">
-                <option :value="true">Yes</option>
-                <option :value="false">No</option>
-            </select>
+            <span class="form-label d-block">Show Key Signature</span>
+            <div class="btn-group" role="group" aria-label="Show key signature">
+                <button type="button" class="btn" :class="setting.showKeySignature ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.showKeySignature = true">Yes</button>
+                <button type="button" class="btn" :class="!setting.showKeySignature ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.showKeySignature = false">No</button>
+            </div>
         </div>
 
         <!-- Toolbar Auto-hide -->
         <div class="mb-3">
-            <label for="toolbarAutoHide" class="form-label">Auto-hide bottom toolbar</label>
-            <select id="toolbarAutoHide" class="form-select" v-model="setting.toolbarAutoHide">
-                <option :value="false">No</option>
-                <option :value="true">Yes</option>
-            </select>
+            <span class="form-label d-block">Auto-hide bottom toolbar</span>
+            <div class="btn-group" role="group" aria-label="Auto-hide bottom toolbar">
+                <button type="button" class="btn" :class="!setting.toolbarAutoHide ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.toolbarAutoHide = false">No</button>
+                <button type="button" class="btn" :class="setting.toolbarAutoHide ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.toolbarAutoHide = true">Yes</button>
+            </div>
         </div>
 
         <h2 class="mt-5 mb-4">Assists</h2>
 
         <!-- Note Color refer to SettingSchema   noteColor: z.enum(["rocksmith", "none"]).default("none"), -->
         <div class="mb-3">
-            <label for="noteColor" class="form-label">Note Color</label>
-            <select id="noteColor" class="form-select" v-model="setting.noteColor">
-                <option value="none">No Color</option>
-                <option value="rocksmith">Rocksmith 2014 Color Scheme</option>
-                <option value="louis-bass-v">Louis' 5-string Bass Color Scheme</option>
-            </select>
+            <span class="form-label d-block">Note Color</span>
+            <div class="btn-group" role="group" aria-label="Note color">
+                <button type="button" class="btn" :class="setting.noteColor === 'none' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.noteColor = 'none'">No Color</button>
+                <button type="button" class="btn" :class="setting.noteColor === 'rocksmith' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.noteColor = 'rocksmith'">Rocksmith 2014</button>
+                <button type="button" class="btn" :class="setting.noteColor === 'louis-bass-v' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="setting.noteColor = 'louis-bass-v'">Louis' 5-string Bass</button>
+            </div>
         </div>
 
         <!--     cursor: z.enum(["animated", "instant", "bar", "invisible"]).default("animated"),-->

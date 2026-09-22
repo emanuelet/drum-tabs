@@ -30,6 +30,8 @@ export default defineComponent({
             youtubePlayer: null,
             youtubeSyncTimer: undefined,
             isLoggedIn: false,
+            youtubeSyncPointMarkers: [],
+            selectedYoutubeSyncBarIndex: null,
             title: "",
             artist: "",
             youtube: {},
@@ -54,6 +56,7 @@ export default defineComponent({
             muteTrackList: {},
             masterVolume: 100,
             trackVolumeList: {},
+            allowVolumeBoost: false,
             currentAudio: "synth",
             youtubeList: [],
             audioList: [],
@@ -66,6 +69,9 @@ export default defineComponent({
             isInitializingAudio: false,
             isCountingIn: false,
             seekDownBeat: null,
+            isYoutubeSyncEditing: false,
+            youtubeSyncBarIndex: 1,
+            youtubeSyncOffsetSeconds: 0,
 
             keyEvents: (e) => {
                 // Do not handle these tagName, because the only input is sync point, it is weird when play space to test the sync point
@@ -120,6 +126,10 @@ export default defineComponent({
             return Math.round(this.tempo * this.speed) / 100;
         },
 
+        formattedBpm() {
+            return this.bpm.toFixed(2);
+        },
+
         audioSelectionLabel() {
             if (this.currentAudio === "synth") return "Synth";
             if (this.currentAudio === "none") return "Mute";
@@ -127,6 +137,15 @@ export default defineComponent({
             if (this.currentAudio.startsWith("youtube-")) return "Youtube";
             if (this.currentAudio.startsWith("audio-")) return "Audio";
             return "Audio";
+        },
+
+        youtubeSyncPoints() {
+            return convertAlphaTexSyncPoint(this.youtube?.advancedSync ?? "")
+                .map((point) => ({
+                    ...point,
+                    offsetSeconds: point.millisecondOffset / 1000,
+                }))
+                .sort((a, b) => a.barIndex - b.barIndex || a.barOccurence - b.barOccurence);
         },
     },
 
@@ -309,7 +328,12 @@ export default defineComponent({
             this.applyMetronome();
 
             if (!this.currentAudio.startsWith("youtube-")) {
-                this.destroyYoutubePlayer();
+                // AlphaTab pauses its current backing-track handler while updateSettings
+                // replaces it. Keep the YouTube iframe alive until that teardown completes.
+                this.stopYoutubeSync();
+                this.isYoutubeSyncEditing = false;
+                this.youtubeSyncPointMarkers = [];
+                this.selectedYoutubeSyncBarIndex = null;
             }
 
             const range = this.api.playbackRange;
@@ -336,6 +360,7 @@ export default defineComponent({
             } else {
                 // Unknown audio source, fallback to synth
                 await this.initSynth();
+                this.destroyYoutubePlayer();
                 notify({
                     type: "error",
                     title: "Error",
@@ -344,6 +369,9 @@ export default defineComponent({
                 return;
             }
 
+            if (!this.currentAudio.startsWith("youtube-")) {
+                this.destroyYoutubePlayer();
+            }
             this.setConfig("audio", this.currentAudio);
         },
     },
@@ -751,6 +779,7 @@ export default defineComponent({
 
                 this.api.beatMouseDown.on((beat) => {
                     this.seekDownBeat = this.getBeatKey(beat);
+                    this.selectYoutubeSyncBar(beat);
                 });
                 this.api.beatMouseUp.on((beat) => {
                     const downBeat = this.seekDownBeat;
@@ -759,6 +788,7 @@ export default defineComponent({
                         this.startPlayback();
                     }
                 });
+                this.api.renderFinished.on(() => this.updateYoutubeSyncPointMarkers());
 
                 // iOS 16.4+: Enable audio playback even when silent switch is ON
                 if ("audioSession" in navigator) {
@@ -804,6 +834,7 @@ export default defineComponent({
                     this.tempo = score.masterBars[0]?.tempoAutomations[0]?.value ?? 120;
                     this.speed = 100;
                     this.speed = this.getConfig("speed", 100);
+                    this.allowVolumeBoost = this.getConfig("allowVolumeBoost", false);
 
                     // Scroll Mode
                     // Force Smooth from horizontal tab
@@ -875,6 +906,9 @@ export default defineComponent({
             this.soloTrackID = -1;
             this.youtube = {};
             this.simpleSyncSecond = -1;
+            this.isYoutubeSyncEditing = false;
+            this.youtubeSyncBarIndex = 1;
+            this.youtubeSyncOffsetSeconds = 0;
             this.muteTrackList = {};
             this.playbackRange = null;
             this.savedPlaybackRange = null;
@@ -898,6 +932,139 @@ export default defineComponent({
             const syncPoints = convertAlphaTexSyncPoint(syncPointsText);
             this.api.score.applyFlatSyncPoints(syncPoints);
             console.log("Applying advanced sync points:", syncPoints);
+        },
+
+        startYoutubeSyncEdit() {
+            this.isYoutubeSyncEditing = !this.isYoutubeSyncEditing;
+            if (this.isYoutubeSyncEditing) {
+                this.youtubeSyncOffsetSeconds = this.getYoutubeSyncOffsetSeconds();
+            } else {
+                this.selectedYoutubeSyncBarIndex = null;
+            }
+            this.$nextTick(() => this.updateYoutubeSyncPointMarkers());
+        },
+
+        getYoutubeSyncOffsetSeconds() {
+            const offset = this.youtubePlayer?.getCurrentTime?.();
+            return Number.isFinite(offset) ? Number(offset.toFixed(3)) : 0;
+        },
+
+        selectYoutubeSyncBar(beat) {
+            if (!this.isYoutubeSyncEditing) {
+                return;
+            }
+
+            const modelBeat = beat?.beat ?? beat;
+            const barIndex = modelBeat?.voice?.bar?.masterBar?.index;
+            if (!Number.isInteger(barIndex)) {
+                return;
+            }
+
+            this.youtubeSyncBarIndex = barIndex + 1;
+            const existingSyncPoint = this.youtubeSyncPoints.find((syncPoint) => syncPoint.barIndex === barIndex && syncPoint.barOccurence === 0);
+            this.selectedYoutubeSyncBarIndex = existingSyncPoint ? barIndex : null;
+            this.youtubeSyncOffsetSeconds = existingSyncPoint?.offsetSeconds ?? this.getYoutubeSyncOffsetSeconds();
+            this.$nextTick(() => this.scrollToSelectedYoutubeSyncMarker());
+        },
+
+        addYoutubeSyncPoint() {
+            const displayedBarIndex = Number(this.youtubeSyncBarIndex);
+            const offsetSeconds = Number(this.youtubeSyncOffsetSeconds);
+            if (!Number.isInteger(displayedBarIndex) || displayedBarIndex < 1 || !Number.isFinite(offsetSeconds) || offsetSeconds < 0) {
+                notify({ type: "error", title: "Error", text: "Enter a valid bar and video offset." });
+                return;
+            }
+            const barIndex = displayedBarIndex - 1;
+
+            const syncPoint = `\\sync ${barIndex} 0 ${Math.round(offsetSeconds * 1000)}`;
+            const lines = (this.youtube.advancedSync ?? "").split("\n");
+            const existingPoint = lines.findIndex((line) => {
+                const parts = line.trim().split(/\s+/);
+                return parts[0] === "\\sync" && Number(parts[1]) === barIndex && Number(parts[2]) === 0;
+            });
+
+            if (existingPoint === -1) {
+                lines.push(syncPoint);
+            } else {
+                lines[existingPoint] = syncPoint;
+            }
+
+            this.youtube.advancedSync = lines.filter((line) => line.trim()).join("\n");
+            this.advancedSync(this.youtube.advancedSync);
+            this.selectedYoutubeSyncBarIndex = barIndex;
+            this.updateYoutubeSyncPointMarkers();
+            this.$nextTick(() => this.scrollToSelectedYoutubeSyncMarker());
+            notify({
+                type: "success",
+                text: existingPoint === -1 ? `Added sync point for bar ${displayedBarIndex}.` : `Updated sync point for bar ${displayedBarIndex}.`,
+            });
+        },
+
+        selectExistingYoutubeSyncPoint(syncPoint) {
+            this.youtubeSyncBarIndex = syncPoint.barIndex + 1;
+            this.youtubeSyncOffsetSeconds = syncPoint.offsetSeconds;
+            this.selectedYoutubeSyncBarIndex = syncPoint.barIndex;
+            this.updateYoutubeSyncPointMarkers();
+            this.$nextTick(() => this.scrollToSelectedYoutubeSyncMarker());
+        },
+
+        deleteYoutubeSyncPoint() {
+            if (!Number.isInteger(this.selectedYoutubeSyncBarIndex)) {
+                return;
+            }
+
+            const barIndex = this.selectedYoutubeSyncBarIndex;
+            this.youtube.advancedSync = (this.youtube.advancedSync ?? "")
+                .split("\n")
+                .filter((line) => {
+                    const parts = line.trim().split(/\s+/);
+                    return parts[0] !== "\\sync" || Number(parts[1]) !== barIndex || Number(parts[2]) !== 0;
+                })
+                .filter((line) => line.trim())
+                .join("\n");
+            this.advancedSync(this.youtube.advancedSync);
+            this.selectedYoutubeSyncBarIndex = null;
+            this.updateYoutubeSyncPointMarkers();
+            notify({ type: "success", text: `Deleted sync point for bar ${barIndex + 1}.` });
+        },
+
+        scrollToSelectedYoutubeSyncMarker() {
+            if (!Number.isInteger(this.selectedYoutubeSyncBarIndex)) {
+                return;
+            }
+
+            const marker = this.$refs.bassTabContainer?.parentElement?.querySelector(`[data-sync-bar-index="${this.selectedYoutubeSyncBarIndex}"]`);
+            marker?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        },
+
+        async saveYoutubeSyncPoints() {
+            if (await this.saveYoutube()) {
+                notify({ type: "success", text: "Audio sync saved." });
+                this.isYoutubeSyncEditing = false;
+                this.youtubeSyncPointMarkers = [];
+                this.selectedYoutubeSyncBarIndex = null;
+            }
+        },
+
+        updateYoutubeSyncPointMarkers() {
+            if (!this.isYoutubeSyncEditing || !this.api?.boundsLookup) {
+                this.youtubeSyncPointMarkers = [];
+                return;
+            }
+
+            this.youtubeSyncPointMarkers = this.youtubeSyncPoints.flatMap((syncPoint) => {
+                const bounds = this.api.boundsLookup.findMasterBarByIndex(syncPoint.barIndex);
+                if (!bounds) {
+                    return [];
+                }
+
+                const { x, y, h } = bounds.lineAlignedBounds;
+                return [{
+                    barIndex: syncPoint.barIndex,
+                    isSelected: syncPoint.barIndex === this.selectedYoutubeSyncBarIndex,
+                    style: { left: `${x}px`, top: `${y}px`, height: `${h}px` },
+                }];
+            });
         },
 
         getBeatKey(beat) {
@@ -1425,6 +1592,7 @@ export default defineComponent({
 
             this.youtubePlayer = player;
             this.alphaTabYoutubeHandler = alphaTabYoutubeHandler;
+            this.youtubePlayer.setVolume(Math.min(100, this.masterVolume));
             clearTimeout(ytWarning);
         },
 
@@ -1575,7 +1743,20 @@ export default defineComponent({
             if (!Number.isFinite(parsedVolume)) {
                 return fallback;
             }
-            return Math.min(1000, Math.max(0, parsedVolume));
+            return Math.min(this.allowVolumeBoost ? 200 : 100, Math.max(0, parsedVolume));
+        },
+
+        setAllowVolumeBoost(allowVolumeBoost) {
+            this.allowVolumeBoost = allowVolumeBoost;
+            if (!allowVolumeBoost) {
+                this.masterVolume = this.normalizeVolume(this.masterVolume);
+                this.trackVolumeList = Object.fromEntries(Object.entries(this.trackVolumeList).map(([trackID, volume]) => [trackID, this.normalizeVolume(volume)]));
+                this.applyTrackVolumes();
+                this.youtubePlayer?.setVolume(this.masterVolume);
+                this.setConfig("masterVolume", this.masterVolume);
+                this.setConfig("trackVolumeList", this.trackVolumeList);
+            }
+            this.setConfig("allowVolumeBoost", allowVolumeBoost);
         },
 
         initializeTrackVolumes(tracks) {
@@ -1617,6 +1798,7 @@ export default defineComponent({
             this.masterVolume = normalizedVolume;
             this.trackVolumeList = trackVolumeList;
             this.api.changeTrackVolume(this.api.score.tracks, normalizedVolume / 100);
+            this.youtubePlayer?.setVolume(Math.min(100, normalizedVolume));
             this.setConfig("masterVolume", normalizedVolume);
             this.setConfig("trackVolumeList", trackVolumeList);
         },
@@ -1677,8 +1859,10 @@ export default defineComponent({
                 });
 
                 await checkFetch(res);
+                return true;
             } catch (e) {
                 generalError(e);
+                return false;
             }
         },
 
@@ -1773,7 +1957,13 @@ export default defineComponent({
         <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature">
             {{ keySignature }}
         </div>
-        <div ref="bassTabContainer" v-pre></div>
+        <div class="score-container">
+            <div ref="bassTabContainer" v-pre></div>
+            <div class="youtube-sync-tab-markers" v-if="isYoutubeSyncEditing">
+                <span class="youtube-sync-tab-marker" :class="{ selected: marker.isSelected }" v-for="marker in youtubeSyncPointMarkers" :key="marker.barIndex" :data-sync-bar-index="marker.barIndex"
+                    :style="marker.style" :title="`Sync point: bar ${marker.barIndex + 1}`"></span>
+            </div>
+        </div>
 
         <!-- Just add a margin, don't let youtube player overlay the tab -->
         <div :class='{ "yt-margin": currentAudio.startsWith(`youtube-`) }'></div>
@@ -1831,14 +2021,14 @@ export default defineComponent({
                 <div class="speed-selector">
                     <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
                         <font-awesome-icon :icon='["fas", "gauge-high"]' />
-                        Speed: {{ bpm }} BPM
+                        Speed: {{ formattedBpm }} BPM
                     </button>
                     <div class="speed-selector-popover" v-if="showSpeedSelector">
                         <div class="speed-selector-header">
                             <div class="speed-selector-bpm">
                                 <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
                                 <label class="visually-hidden" for="bpm-input">BPM</label>
-                                <input id="bpm-input" :value="bpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
+                                <input id="bpm-input" :value="formattedBpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
                                     @change="setBpm($event.target.value)" />
                                 <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
                                 <span>BPM</span>
@@ -1881,20 +2071,38 @@ export default defineComponent({
                 <div class="p-2 text-end list-header">
                     <font-awesome-icon :icon='["fas", "xmark"]' class="me-2 close" @click="showTrackList = false" />
                 </div>
+                <label class="volume-boost-toggle">
+                    <span>Allow volume boost</span>
+                    <span class="volume-boost-switch">
+                        <input type="checkbox" :checked="allowVolumeBoost" @change="setAllowVolumeBoost($event.target.checked)" />
+                        <span aria-hidden="true"></span>
+                    </span>
+                </label>
+                <div class="volume-column-header">Volume</div>
 
                 <div class="master-volume item">
                     <div class="name">Master</div>
                     <div class="list-button select-percentage">
-                        Volume: <input type="number" min="0" max="1000" step="1" :value="masterVolume" @input="setMasterVolume($event.target.value)" /> (%)
+                        <input :class="{ 'boost-enabled': allowVolumeBoost }" type="range" min="0" :max="allowVolumeBoost ? 200 : 100" step="1" :value="masterVolume"
+                            @input="setMasterVolume($event.target.value)" />
+                        <output>{{ masterVolume }}%</output>
                     </div>
                 </div>
 
                 <div class="track item" v-for="track in tracks" :key="track.id" :class="{ active: selectedTrack === track.id }">
                     <div class="name" @click="changeTrack(track.id)">{{ track.name }}</div>
-                    <div class="list-button solo" @click="toggleSolo(track.id)" :class="{ active: soloTrackID === track.id }">Solo</div>
-                    <div class="list-button mute" @click="toggleMute(track.id)" :class="{ active: muteTrackList[track.id] }">Mute</div>
-                    <div class="list-button select-percentage">
-                        Volume: <input type="number" min="0" max="1000" step="1" :value="trackVolumeList[track.id] ?? masterVolume" @input="setTrackVolume(track.id, $event.target.value)" /> (%)
+                    <button class="list-button solo" type="button" @click="toggleSolo(track.id)" :class="{ active: soloTrackID === track.id }" :disabled='currentAudio.startsWith("youtube-")'>
+                        <font-awesome-icon :icon='["fas", "headphones"]' />
+                        Solo
+                    </button>
+                    <button class="list-button mute" type="button" @click="toggleMute(track.id)" :class="{ active: muteTrackList[track.id] }" :disabled='currentAudio.startsWith("youtube-")'>
+                        <font-awesome-icon :icon='["fas", "volume-xmark"]' />
+                        Mute
+                    </button>
+                    <div class="list-button select-percentage" :class="{ disabled: currentAudio.startsWith('youtube-') || muteTrackList[track.id] }">
+                        <input :class="{ 'boost-enabled': allowVolumeBoost }" type="range" min="0" :max="allowVolumeBoost ? 200 : 100" step="1" :value="trackVolumeList[track.id] ?? masterVolume"
+                            @input="setTrackVolume(track.id, $event.target.value)" :disabled='currentAudio.startsWith("youtube-") || muteTrackList[track.id]' />
+                        <output>{{ trackVolumeList[track.id] ?? masterVolume }}%</output>
                     </div>
                 </div>
             </div>
@@ -1905,7 +2113,10 @@ export default defineComponent({
                 </div>
 
                 <div class="audio item" @click="audioSynth" :class='{ active: currentAudio === "synth" }'>
-                    <div class="name">Synth</div>
+                    <div class="name">
+                        <font-awesome-icon :icon='["fas", "music"]' class="me-2" />
+                        Synth
+                    </div>
                 </div>
 
                 <div class="audio item" @click="audioBackingTrack" :class='{ active: currentAudio === "backingTrack" }' v-if="enableBackingTrack">
@@ -1913,11 +2124,17 @@ export default defineComponent({
                 </div>
 
                 <div class="audio item" @click="audioYoutube(youtube.videoID)" v-for="youtube in youtubeList" :key="youtube.id" :class='{ active: currentAudio === "youtube-" + youtube.videoID }'>
-                    <div class="name">Youtube: {{ youtube.videoID }}</div>
+                    <div class="name">
+                        <font-awesome-icon :icon='["fas", "play"]' class="me-2" />
+                        Youtube: {{ youtube.videoID }}
+                    </div>
                 </div>
 
                 <div class="audio item" @click="audioFile(audio.filename)" v-for="audio in audioList" :key="audio.filename" :class='{ active: currentAudio === "audio-" + audio.filename }'>
-                    <div class="name">{{ audio.filename }}</div>
+                    <div class="name">
+                        <font-awesome-icon :icon='["fas", "file"]' class="me-2" />
+                        {{ audio.filename }}
+                    </div>
                 </div>
 
                 <!-- No Audio -->
@@ -1943,7 +2160,47 @@ export default defineComponent({
                 </div>
 
                 <!-- Youtube Player -->
-                <div v-show='currentAudio.startsWith("youtube-")'>
+                <div v-show='currentAudio.startsWith("youtube-")' class="youtube-player">
+                    <button class="btn btn-secondary" type="button" @click="startYoutubeSyncEdit" v-if='syncMethod === "advanced" && isLoggedIn && !isYoutubeSyncEditing'>
+                            <font-awesome-icon :icon='["fas", "gear"]' />
+                            Fix Audio Sync
+                    </button>
+                    <div class="youtube-sync-editor" v-if='syncMethod === "advanced" && isLoggedIn && isYoutubeSyncEditing'>
+                        <button class="youtube-sync-close" type="button" aria-label="Close audio sync editor" title="Close audio sync editor" @click="startYoutubeSyncEdit">
+                            <font-awesome-icon :icon='["fas", "xmark"]' />
+                        </button>
+                        <div class="youtube-sync-fields">
+                            <label>
+                                Bar
+                                <input v-model.number="youtubeSyncBarIndex" type="number" min="1" step="1" />
+                            </label>
+                            <label>
+                                Offset (s)
+                                <input v-model.number="youtubeSyncOffsetSeconds" type="number" min="0" step="0.001" />
+                            </label>
+                            <button class="btn btn-primary" type="button" @click="addYoutubeSyncPoint" v-if="selectedYoutubeSyncBarIndex === null">
+                                <font-awesome-icon :icon='["fas", "plus"]' />
+                                Add
+                            </button>
+                            <button class="btn btn-primary" type="button" @click="addYoutubeSyncPoint" v-else>
+                                <font-awesome-icon :icon='["fas", "pen"]' />
+                                Edit
+                            </button>
+                            <button class="btn btn-danger" type="button" @click="deleteYoutubeSyncPoint" v-if="selectedYoutubeSyncBarIndex !== null">
+                                <font-awesome-icon :icon='["fas", "trash-can"]' />
+                                Delete
+                            </button>
+                        </div>
+                        <div class="youtube-sync-points" v-if="youtubeSyncPoints.length">
+                            <button class="youtube-sync-point" :class="{ active: syncPoint.barIndex === selectedYoutubeSyncBarIndex }" type="button" v-for="syncPoint in youtubeSyncPoints"
+                                :key="`${syncPoint.barIndex}:${syncPoint.barOccurence}:${syncPoint.barPosition}`"
+                                @click="selectExistingYoutubeSyncPoint(syncPoint)">
+                                <span class="youtube-sync-point-marker" aria-hidden="true"></span>
+                                Bar {{ syncPoint.barIndex + 1 }}: {{ syncPoint.offsetSeconds.toFixed(3) }}s
+                            </button>
+                        </div>
+                        <button class="btn btn-success youtube-sync-save" type="button" @click="saveYoutubeSyncPoints">Save Sync</button>
+                    </div>
                     <div ref="youtube" class="player"></div>
                 </div>
 
@@ -2067,11 +2324,136 @@ $youtube-height: 200px;
                 color: white;
             }
         }
+
+        .youtube-sync-editor {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            box-sizing: border-box;
+            height: 180px;
+            padding: 8px 40px 8px 8px;
+            color: white;
+            background-color: $dark1;
+        }
+
+        .youtube-sync-close {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            color: white;
+            background: transparent;
+            border: 0;
+            border-radius: 4px;
+
+            &:hover {
+                background-color: #32393e;
+            }
+        }
+
+        .youtube-sync-fields {
+            display: flex;
+            align-items: end;
+            gap: 8px;
+
+            label {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                font-size: 12px;
+            }
+
+            input {
+                width: 90px;
+                height: 38px;
+                padding: 6px 8px;
+                color: white;
+                font-size: 16px;
+                background-color: #32393e;
+                border: 1px solid #555b60;
+            }
+        }
+
+        .youtube-sync-points {
+            display: flex;
+            max-width: 100%;
+            gap: 4px;
+            overflow-x: auto;
+        }
+
+        .youtube-sync-save {
+            align-self: stretch;
+            margin-top: auto;
+        }
+
+        .youtube-sync-point {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            color: white;
+            font-size: 12px;
+            background: #32393e;
+            border: 1px solid #555b60;
+            border-radius: 3px;
+
+            &:hover {
+                background: #41494f;
+            }
+
+            &.active {
+                border-color: #ff9f1a;
+                box-shadow: inset 0 0 0 1px #ff9f1a;
+            }
+        }
+
+        .youtube-sync-point-marker {
+            width: 4px;
+            height: 20px;
+            background: #f8d84d;
+            border-radius: 2px;
+        }
+
+        .youtube-player {
+            display: flex;
+            align-items: end;
+        }
     }
 }
 
 .youtube {
     margin-top: 20px;
+}
+
+.score-container {
+    position: relative;
+}
+
+.youtube-sync-tab-markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.youtube-sync-tab-marker {
+    position: absolute;
+    z-index: 1;
+    width: 4px;
+    background: #f8d84d;
+    border-radius: 2px;
+    transform: translateX(-2px);
+
+    &.selected {
+        width: 6px;
+        background: #ff9f1a;
+        box-shadow: 0 0 8px #ff9f1a;
+        transform: translateX(-3px);
+    }
 }
 
 h1 {
@@ -2178,6 +2560,74 @@ $padding: 20px;
 }
 
 .track-list {
+    .volume-boost-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: $padding;
+        font-size: 13px;
+        background-color: color.adjust($color, $lightness: 5%);
+        border-bottom: 1px solid color.adjust($color, $lightness: -5%);
+        cursor: pointer;
+    }
+
+    .volume-boost-switch {
+        position: relative;
+        width: 36px;
+        height: 20px;
+
+        input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            opacity: 0;
+            cursor: pointer;
+
+            &:checked + span {
+                background-color: $primary;
+
+                &::after {
+                    transform: translateX(16px);
+                }
+            }
+
+            &:focus-visible + span {
+                outline: 2px solid #f1f4f7;
+                outline-offset: 2px;
+            }
+        }
+
+        > span {
+            display: block;
+            height: 100%;
+            background-color: color.adjust($color, $lightness: -15%);
+            border-radius: 999px;
+            pointer-events: none;
+
+            &::after {
+                display: block;
+                width: 16px;
+                height: 16px;
+                margin: 2px;
+                content: "";
+                background-color: #f1f4f7;
+                border-radius: 50%;
+                transition: transform 0.2s;
+            }
+        }
+    }
+
+    .volume-column-header {
+        width: 194px;
+        padding: 8px $padding;
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 1px solid color.adjust($color, $lightness: -5%);
+    }
+
     .track,
     .master-volume {
         .list-button {
@@ -2186,12 +2636,28 @@ $padding: 20px;
             padding: $padding;
             height: 100%;
 
+            &.solo,
+            &.mute {
+                color: inherit;
+                font: inherit;
+                border-top: 0;
+                border-bottom: 0;
+                border-left: 0;
+                cursor: pointer;
+            }
+
             &:hover {
                 background-color: color.adjust($primary, $lightness: 5%);
             }
 
             &.active {
                 background-color: color.adjust($primary, $lightness: 8%);
+            }
+
+            &:disabled,
+            &.disabled {
+                cursor: not-allowed;
+                opacity: .5;
             }
         }
     }
@@ -2349,8 +2815,46 @@ $padding: 20px;
     gap: 4px;
 
     input {
-        min-width: 90px;
-        border: 0;
+        width: 120px;
+        height: 6px;
+        margin: 0;
+        appearance: none;
+        cursor: pointer;
+        background: #5f6b78;
+        border-radius: 999px;
+
+        &.boost-enabled {
+            background: linear-gradient(to right, #5f6b78 0 49%, #f0c674 49% 51%, #a64040 51% 100%);
+        }
+
+        &::-webkit-slider-thumb {
+            width: 14px;
+            height: 14px;
+            appearance: none;
+            cursor: grab;
+            background: #f1f4f7;
+            border: 2px solid #32393e;
+            border-radius: 50%;
+        }
+
+        &::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            cursor: grab;
+            background: #f1f4f7;
+            border: 2px solid #32393e;
+            border-radius: 50%;
+        }
+
+        &:disabled {
+            cursor: not-allowed;
+            opacity: .45;
+        }
+    }
+
+    output {
+        min-width: 42px;
+        text-align: right;
     }
 }
 
@@ -2376,14 +2880,16 @@ $padding: 20px;
 .speed-selector-popover {
     position: absolute;
     bottom: calc(100% + 10px);
-    right: 0;
+    left: 50%;
     z-index: 2;
-    width: 370px;
+    box-sizing: border-box;
+    width: 420px;
     padding: 12px 18px 22px;
     color: #d9e0e8;
     background: #262d35;
     box-shadow: 0 12px 28px rgba(32, 46, 62, 0.14);
     border-radius: 6px;
+    transform: translateX(-50%);
 }
 
 .main.light .speed-selector-popover {
@@ -2579,6 +3085,20 @@ $padding: 20px;
             .sync-offset {
                 display: none;
             }
+
+            .youtube-sync-fields {
+                flex-wrap: wrap;
+            }
+
+            .youtube-sync-editor {
+                height: auto;
+                min-height: 180px;
+            }
+
+            .youtube-player {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
     }
 
@@ -2589,7 +3109,14 @@ $padding: 20px;
     }
 
     .speed-selector {
-        width: min(370px, calc(100vw - 32px));
+        width: min(420px, calc(100vw - 32px));
+
+        .speed-selector-popover {
+            right: auto;
+            left: 0;
+            width: 100%;
+            transform: none;
+        }
     }
 
     .drum-notation-tooltip {
