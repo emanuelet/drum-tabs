@@ -2612,6 +2612,7 @@ $padding: 20px;
                 height: 16px;
                 margin: 2px;
                 content: "";
+                transform: translate(0px, 10%);
                 background-color: #f1f4f7;
                 border-radius: 50%;
                 transition: transform 0.2s;

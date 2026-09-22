@@ -17,6 +17,10 @@ Drum Tabs is a drum-focused fork of [It's MyTabs](https://github.com/louislam/it
 
 ![Drum Tabs mixer](docs/screenshots/mixer.png)
 
+![Drum Tabs youtube](docs/screenshots/youtube.png)
+
+![Drum Tabs sync editor](docs/screenshots/sync%20editor.png)
+
 ## Live Demo
 
 https://drum-tabs.emanuele-tonello.workers.dev/tab/1270153f-9184-461a-be21-0037bfdd1bbd

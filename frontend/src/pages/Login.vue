@@ -11,19 +11,24 @@ export default defineComponent({
         return {
             processing: false,
             email: "",
-            pin: "",
+            pinDigits: Array(6).fill(""),
             rememberMe: true,
             error: "",
         };
     },
     methods: {
         async submit() {
+            const pin = this.pinDigits.join("");
+            if (pin.length !== 6) {
+                return;
+            }
+
             this.processing = true;
             this.error = "";
 
             const { data, error } = await authClient.signIn.email({
                 email: this.email,
-                password: this.pin,
+                password: pin,
                 rememberMe: this.rememberMe,
             });
 
@@ -41,6 +46,39 @@ export default defineComponent({
             }
 
             this.processing = false;
+        },
+        updatePin(index, value) {
+            const digits = value.replace(/\D/g, "").slice(0, 6 - index);
+            const pinDigits = [...this.pinDigits];
+
+            if (!digits) {
+                pinDigits[index] = "";
+            } else {
+                for (const [offset, digit] of [...digits].entries()) {
+                    pinDigits[index + offset] = digit;
+                }
+            }
+
+            this.pinDigits = pinDigits;
+            if (digits) {
+                this.focusPin(Math.min(index + digits.length, 5));
+            }
+        },
+        onPinInput(index, event) {
+            this.updatePin(index, event.target.value);
+        },
+        onPinPaste(index, event) {
+            event.preventDefault();
+            this.updatePin(index, event.clipboardData.getData("text"));
+        },
+        onPinKeydown(index, event) {
+            if (event.key === "Backspace" && !this.pinDigits[index] && index > 0) {
+                this.pinDigits[index - 1] = "";
+                this.focusPin(index - 1);
+            }
+        },
+        focusPin(index) {
+            this.$nextTick(() => this.$refs.pinInputs[index]?.focus());
         },
     },
 });
@@ -60,9 +98,28 @@ export default defineComponent({
                     <label for="floatingInput">{{ $t("Email") }}</label>
                 </div>
 
-                <div class="form-floating mt-3">
-                    <input id="floatingPassword" v-model="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="6-digit PIN" required>
-                    <label for="floatingPassword">6-digit PIN</label>
+                <div class="mt-3 text-start" role="group" aria-labelledby="pin-label">
+                    <label id="pin-label" class="form-label">6-digit PIN</label>
+                    <div class="pin-inputs">
+                        <input
+                            v-for="(_, index) in pinDigits"
+                            :key="index"
+                            :id="`pin-${index}`"
+                            ref="pinInputs"
+                            :value="pinDigits[index]"
+                            type="password"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            maxlength="1"
+                            :autocomplete="index === 0 ? 'one-time-code' : 'off'"
+                            :aria-label="`PIN digit ${index + 1}`"
+                            class="form-control pin-input"
+                            required
+                            @input="onPinInput(index, $event)"
+                            @paste="onPinPaste(index, $event)"
+                            @keydown="onPinKeydown(index, $event)"
+                        >
+                    </div>
                 </div>
 
                 <!-- Remember me -->
@@ -112,5 +169,16 @@ export default defineComponent({
         display: block;
         margin: 0 auto 12px;
     }
+}
+
+.pin-inputs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.pin-input {
+    min-width: 0;
+    padding: 0.75rem 0;
+    text-align: center;
 }
 </style>
