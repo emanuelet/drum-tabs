@@ -147,6 +147,49 @@ export default defineComponent({
                 }))
                 .sort((a, b) => a.barIndex - b.barIndex || a.barOccurence - b.barOccurence);
         },
+
+        youtubeSuggestedSyncBars() {
+            const barCount = this.api?.score?.masterBars?.length ?? 0;
+            const anchoredBars = new Set(this.youtubeSyncPoints.map((point) => point.barIndex));
+            const suggestedBars = [];
+
+            for (let barIndex = 16; barIndex < barCount - 1; barIndex += 16) {
+                if (!anchoredBars.has(barIndex)) {
+                    suggestedBars.push(barIndex);
+                }
+            }
+
+            return suggestedBars;
+        },
+
+        youtubeSyncEndWarning() {
+            const barCount = this.api?.score?.masterBars?.length ?? 0;
+            if (!barCount) {
+                return null;
+            }
+
+            const lastAnchor = this.youtubeSyncPoints.at(-1)?.barIndex ?? -1;
+            const finalBar = barCount - 1;
+            if (finalBar - lastAnchor <= 8) {
+                return null;
+            }
+
+            return `Last anchor is bar ${lastAnchor + 1}. Add one near final bar ${finalBar + 1} to prevent end-of-song drift.`;
+        },
+
+        youtubeSyncDriftPreview() {
+            const expectedOffsetSeconds = this.getExpectedYoutubeOffsetSeconds(this.youtubeSyncBarIndex - 1);
+            if (expectedOffsetSeconds === null) {
+                return null;
+            }
+
+            const currentOffsetSeconds = this.getYoutubeSyncOffsetSeconds();
+            return {
+                expectedOffsetSeconds,
+                currentOffsetSeconds,
+                driftSeconds: currentOffsetSeconds - expectedOffsetSeconds,
+            };
+        },
     },
 
     watch: {
@@ -947,6 +990,55 @@ export default defineComponent({
         getYoutubeSyncOffsetSeconds() {
             const offset = this.youtubePlayer?.getCurrentTime?.();
             return Number.isFinite(offset) ? Number(offset.toFixed(3)) : 0;
+        },
+
+        getBarPlaybackStart(barIndex) {
+            for (const track of this.api?.score?.tracks ?? []) {
+                for (const stave of track.staves ?? []) {
+                    const bar = stave.bars?.find((candidate) => candidate.masterBar?.index === barIndex);
+                    const beat = bar?.voices?.flatMap((voice) => voice.beats ?? []).find((candidate) => Number.isFinite(candidate.absolutePlaybackStart));
+                    if (beat) {
+                        return beat.absolutePlaybackStart;
+                    }
+                }
+            }
+            return null;
+        },
+
+        getExpectedYoutubeOffsetSeconds(barIndex) {
+            const barPlaybackStart = this.getBarPlaybackStart(barIndex);
+            const anchors = this.youtubeSyncPoints
+                .map((anchor) => ({ ...anchor, playbackStart: this.getBarPlaybackStart(anchor.barIndex) }))
+                .filter((anchor) => anchor.playbackStart !== null);
+            if (barPlaybackStart === null || anchors.length === 0) {
+                return null;
+            }
+
+            const exactAnchor = anchors.find((anchor) => anchor.barIndex === barIndex);
+            if (exactAnchor) {
+                return exactAnchor.offsetSeconds;
+            }
+
+            const before = [...anchors].reverse().find((anchor) => anchor.barIndex < barIndex);
+            const after = anchors.find((anchor) => anchor.barIndex > barIndex);
+            const [firstAnchor, secondAnchor] = before && after ? [before, after] : anchors.length > 1 ? (before ? anchors.slice(-2) : anchors.slice(0, 2)) : [anchors[0], null];
+            if (!secondAnchor || firstAnchor.playbackStart === secondAnchor.playbackStart) {
+                return firstAnchor.offsetSeconds + (barPlaybackStart - firstAnchor.playbackStart) / 1000;
+            }
+
+            const slope = (secondAnchor.offsetSeconds - firstAnchor.offsetSeconds) / (secondAnchor.playbackStart - firstAnchor.playbackStart);
+            return firstAnchor.offsetSeconds + (barPlaybackStart - firstAnchor.playbackStart) * slope;
+        },
+
+        captureYoutubeSyncPoint() {
+            this.youtubeSyncOffsetSeconds = this.getYoutubeSyncOffsetSeconds();
+            this.addYoutubeSyncPoint();
+        },
+
+        selectSuggestedYoutubeSyncBar(barIndex) {
+            this.youtubeSyncBarIndex = barIndex + 1;
+            this.youtubeSyncOffsetSeconds = this.getYoutubeSyncOffsetSeconds();
+            this.selectedYoutubeSyncBarIndex = null;
         },
 
         selectYoutubeSyncBar(beat) {
@@ -2186,10 +2278,24 @@ export default defineComponent({
                                 <font-awesome-icon :icon='["fas", "pen"]' />
                                 Edit
                             </button>
+                            <button class="btn btn-outline-primary" type="button" @click="captureYoutubeSyncPoint">
+                                Capture &amp; {{ selectedYoutubeSyncBarIndex === null ? "Add" : "Update" }}
+                            </button>
                             <button class="btn btn-danger" type="button" @click="deleteYoutubeSyncPoint" v-if="selectedYoutubeSyncBarIndex !== null">
                                 <font-awesome-icon :icon='["fas", "trash-can"]' />
                                 Delete
                             </button>
+                        </div>
+                        <div class="youtube-sync-diagnostics" v-if="youtubeSyncDriftPreview">
+                            <span>Expected: {{ youtubeSyncDriftPreview.expectedOffsetSeconds.toFixed(3) }}s</span>
+                            <span>Current video: {{ youtubeSyncDriftPreview.currentOffsetSeconds.toFixed(3) }}s</span>
+                            <strong
+                                :class="{ warning: Math.abs(youtubeSyncDriftPreview.driftSeconds) >= 0.1 }">Drift: {{ youtubeSyncDriftPreview.driftSeconds >= 0 ? "+" : "" }}{{ youtubeSyncDriftPreview.driftSeconds.toFixed(3) }}s</strong>
+                            <span class="warning" v-if="youtubeSyncEndWarning">{{ youtubeSyncEndWarning }}</span>
+                        </div>
+                        <div class="youtube-sync-suggestions" v-if="youtubeSuggestedSyncBars.length">
+                            <span>Suggested anchors:</span>
+                            <button v-for="barIndex in youtubeSuggestedSyncBars" :key="barIndex" type="button" @click="selectSuggestedYoutubeSyncBar(barIndex)">Bar {{ barIndex + 1 }}</button>
                         </div>
                         <div class="youtube-sync-points" v-if="youtubeSyncPoints.length">
                             <button class="youtube-sync-point" :class="{ active: syncPoint.barIndex === selectedYoutubeSyncBarIndex }" type="button" v-for="syncPoint in youtubeSyncPoints"
@@ -2308,7 +2414,7 @@ $youtube-height: 200px;
         white-space: nowrap;
 
         .player {
-            height: 180px;
+            height: $youtube-height;
         }
 
         .sync-offset {
@@ -2336,6 +2442,7 @@ $youtube-height: 200px;
             padding: 8px 40px 8px 8px;
             color: white;
             background-color: $dark1;
+            overflow-y: auto;
         }
 
         .youtube-sync-close {
@@ -2383,6 +2490,44 @@ $youtube-height: 200px;
             max-width: 100%;
             gap: 4px;
             overflow-x: auto;
+        }
+
+        .youtube-sync-diagnostics,
+        .youtube-sync-suggestions {
+            max-width: 100%;
+            font-size: 12px;
+        }
+
+        .youtube-sync-diagnostics {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+
+            .warning {
+                color: #f8d84d;
+            }
+        }
+
+        .youtube-sync-suggestions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            overflow-x: auto;
+            white-space: nowrap;
+
+            button {
+                padding: 2px 5px;
+                color: white;
+                font-size: 12px;
+                background: #32393e;
+                border: 1px solid #555b60;
+                border-radius: 3px;
+
+                &:hover {
+                    background: #41494f;
+                }
+            }
         }
 
         .youtube-sync-save {

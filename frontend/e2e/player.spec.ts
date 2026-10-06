@@ -301,6 +301,8 @@ test("edits advanced YouTube sync points from the player", async ({ page }) => {
     await expect(player.getByRole("button", { name: "Fix Audio Sync" })).toBeHidden();
     await expect(player.locator(".youtube-sync-point-marker")).toHaveCount(1);
     await expect(page.locator(".youtube-sync-tab-marker")).toHaveCount(1);
+    await expect(player.getByText(/Last anchor is bar 1/)).toBeVisible();
+    await expect(player.getByRole("button", { name: "Bar 17" })).toBeVisible();
 
     await player.getByRole("button", { name: "Bar 1: 0.000s" }).click();
     await expect(player.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
@@ -316,6 +318,13 @@ test("edits advanced YouTube sync points from the player", async ({ page }) => {
     await expect(inputs.nth(0)).toHaveValue("6");
     await expect(inputs.nth(1)).toHaveValue("12.345");
     await expect(player.getByRole("button", { name: "Add", exact: true })).toBeVisible();
+
+    await player.getByRole("button", { name: "Capture & Add" }).click();
+    await expect(page.getByText("Added sync point for bar 6.")).toBeVisible();
+    await expect(player.locator(".youtube-sync-point-marker")).toHaveCount(2);
+    await player.getByRole("button", { name: "Bar 6: 12.345s" }).click();
+    await player.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(player.locator(".youtube-sync-point-marker")).toHaveCount(1);
 
     await inputs.nth(0).fill("5");
     await inputs.nth(1).fill("12.5");
