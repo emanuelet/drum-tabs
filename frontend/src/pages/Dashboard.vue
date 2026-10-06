@@ -55,18 +55,13 @@ export default defineComponent({
         <div class="my-navbar">
             <Logo />
 
-            <button class="mobile-menu-toggle" type="button" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">Menu</button>
+            <button class="mobile-menu-toggle" type="button" aria-controls="mobile-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">Menu</button>
 
-            <div class="toolbar" :class="{ open: mobileMenuOpen }">
+            <div id="mobile-navigation" class="toolbar" :class="{ open: mobileMenuOpen }">
                 <div class="left" v-show="ready">
                     <router-link to="/" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "folder"]' />
                         Tabs
-                    </router-link>
-
-                    <router-link to="/new-tab" v-if="isLoggedIn">
-                        <font-awesome-icon :icon='["fas", "plus"]' />
-                        New Tab
                     </router-link>
 
                     <router-link to="/exercises" v-if="isLoggedIn">
@@ -84,14 +79,14 @@ export default defineComponent({
                         Settings
                     </router-link>
 
-                    <a href="https://drum-metronome.pages.dev/" target="_blank" rel="noopener noreferrer">
+                    <a class="metronome-link" href="https://drum-metronome.pages.dev/" target="_blank" rel="noopener noreferrer">
                         <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
                         Drum Metronome
                     </a>
                 </div>
 
                 <div class="right" v-show="ready">
-                    <a href="#" @click.prevent="signOut()" v-if="isLoggedIn">
+                    <a class="sign-out-link" href="#" @click.prevent="signOut()" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "arrow-right-from-bracket"]' />
                         Log out
                     </a>
@@ -172,6 +167,14 @@ $navHeight: 100px;
         svg {
             font-size: 20px;
         }
+
+        .metronome-link {
+            color: #9fd6ff;
+        }
+
+        .sign-out-link {
+            color: #ffb1b8;
+        }
     }
 
     .mobile-menu-toggle {
@@ -188,7 +191,9 @@ $navHeight: 100px;
 
     .my-navbar {
         position: relative;
-        height: $navHeightMobile;
+        z-index: 1001;
+        min-height: $navHeightMobile;
+        flex-wrap: wrap;
 
         .navbar-brand {
             width: $navHeightMobile;
@@ -201,21 +206,54 @@ $navHeight: 100px;
             top: 100%;
             right: 0;
             left: 0;
-            z-index: 1;
+            z-index: 1002;
+            flex-basis: 100%;
             display: none;
-            padding: 12px;
+            padding: 8px 16px 16px;
             background-color: #212529;
             border-bottom: 1px solid #3c3b40;
+            box-shadow: 0 8px 16px rgb(0 0 0 / 18%);
 
             &.open {
                 display: flex;
+                flex-direction: column;
             }
 
             & > div {
-                flex: 1;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+
+                &.left,
+                &.right {
+                    justify-content: stretch;
+                }
+
+                & > a {
+                    flex-direction: row;
+                    justify-content: flex-start;
+                    gap: 14px;
+                    min-height: 48px;
+                    padding: 10px 12px;
+                    border-radius: 6px;
+                    font-size: 17px;
+
+                    &:hover,
+                    &:focus-visible {
+                        background: rgb(255 255 255 / 10%);
+                    }
+
+                    svg {
+                        width: 20px;
+                        font-size: 18px;
+                    }
+                }
+
+                &.right {
+                    margin-top: 8px;
+                    padding-top: 8px;
+                    border-top: 1px solid #3c3b40;
+                }
             }
         }
 

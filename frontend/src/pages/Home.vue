@@ -145,44 +145,26 @@ export default defineComponent({
 
 <template>
     <div class="container my-container">
-        <!-- Favorites Section -->
-        <div class="favorites-section" v-if="ready && favoritedTabs.length > 0">
-            <TabItem
-                v-for="tab in favoritedTabs"
-                :key="`fav-${tab.id}`"
-                :tab="tab"
-                :show-artist="true"
-                :can-assign="user?.role === 'teacher'"
-                :can-show-teacher-assignment="user?.role === 'learner'"
-                @delete="deleteTab"
-                @favToggled="handleFavToggled"
-            />
-        </div>
-
         <div class="search-section mb-3 mt-4 pe-3 ps-3" v-if="ready">
-            <div class="input-group">
-                <span class="input-group-text">
-                    <font-awesome-icon icon="magnifying-glass" />
-                </span>
+            <div class="search-row">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <font-awesome-icon icon="magnifying-glass" />
+                    </span>
 
-                <input
-                    type="text"
-                    class="form-control search-input"
-                    v-model="searchQuery"
-                    placeholder="Search by title or artist..."
-                    ref="searchInput"
-                    aria-label="Search tabs"
-                />
+                    <input type="text" class="form-control search-input" v-model="searchQuery"
+                        placeholder="Search by title or artist..." ref="searchInput" aria-label="Search tabs" />
 
-                <button
-                    class="input-group-text bg-transparent border-0 cursor-pointer"
-                    type="button"
-                    @click='searchQuery = ""'
-                    v-if="searchQuery"
-                    aria-label="Clear search"
-                >
-                    ✕
-                </button>
+                    <button class="input-group-text bg-transparent border-0 cursor-pointer" type="button"
+                        @click='searchQuery = ""' v-if="searchQuery" aria-label="Clear search">
+                        ✕
+                    </button>
+                </div>
+
+                <router-link class="btn btn-primary new-tab-button" to="/new-tab">
+                    <font-awesome-icon :icon='["fas", "plus"]' />
+                    New Tab
+                </router-link>
             </div>
         </div>
 
@@ -195,45 +177,38 @@ export default defineComponent({
             </div>
 
             <div class="form-check form-switch mb-0">
-                <input id="groupByArtist" v-model="setting.groupByArtist" class="form-check-input" type="checkbox" role="switch" @change="persistSetting" />
+                <input id="groupByArtist" v-model="setting.groupByArtist" class="form-check-input" type="checkbox"
+                    role="switch" @change="persistSetting" />
                 <label class="form-check-label" for="groupByArtist">Group by artist</label>
             </div>
         </div>
+
+        <!-- Favorites stay near the tab list, not above primary controls. -->
+        <div class="favorites-section" v-if="ready && favoritedTabs.length > 0">
+            <TabItem v-for="tab in favoritedTabs" :key="`fav-${tab.id}`" :tab="tab" :show-artist="true"
+                :can-assign="user?.role === 'teacher'" :can-show-teacher-assignment="user?.role === 'learner'"
+                @delete="deleteTab" @favToggled="handleFavToggled" />
+        </div>
+
+
 
         <template v-if="this.setting.groupByArtist && groupedTabs">
             <div v-for="group in groupedTabs" :key="group.displayName" class="mb-4 ms-3">
                 <h4>{{ group.displayName }}</h4>
 
-                <TabItem
-                    v-for="tab in group.tabs"
-                    :key="tab.id"
-                    :tab="tab"
-                    :show-artist="false"
-                    :can-assign="user?.role === 'teacher'"
-                    :can-show-teacher-assignment="user?.role === 'learner'"
-                    @delete="deleteTab"
-                    @favToggled="handleFavToggled"
-                />
+                <TabItem v-for="tab in group.tabs" :key="tab.id" :tab="tab" :show-artist="false"
+                    :can-assign="user?.role === 'teacher'" :can-show-teacher-assignment="user?.role === 'learner'"
+                    @delete="deleteTab" @favToggled="handleFavToggled" />
             </div>
         </template>
 
         <template v-else>
-            <TabItem
-                v-for="tab in filteredTabList"
-                :key="tab.id"
-                :tab="tab"
-                :show-artist="true"
-                :can-assign="user?.role === 'teacher'"
-                :can-show-teacher-assignment="user?.role === 'learner'"
-                @delete="deleteTab"
-                @favToggled="handleFavToggled"
-            />
+            <TabItem v-for="tab in filteredTabList" :key="tab.id" :tab="tab" :show-artist="true"
+                :can-assign="user?.role === 'teacher'" :can-show-teacher-assignment="user?.role === 'learner'"
+                @delete="deleteTab" @favToggled="handleFavToggled" />
         </template>
 
-        <div
-            v-if="ready && filteredTabList.length === 0 && searchQuery"
-            class="empty-state text-center py-5 mb-4 fs-5"
-        >
+        <div v-if="ready && filteredTabList.length === 0 && searchQuery" class="empty-state text-center py-5 mb-4 fs-5">
             <p class="text-muted">No tabs found for "{{ searchQuery }}"</p>
 
             <button class="btn btn-sm btn-outline-secondary" @click='searchQuery = ""'>
@@ -262,5 +237,27 @@ h4 {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+}
+
+.search-row {
+    display: flex;
+    gap: 12px;
+
+    .input-group {
+        min-width: 0;
+    }
+}
+
+.new-tab-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .search-row {
+        align-items: stretch;
+    }
 }
 </style>

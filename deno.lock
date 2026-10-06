@@ -12,24 +12,24 @@
     "jsr:@std/jsonc@~1.0.2": "1.0.2",
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/path@~1.1.6": "1.1.6",
-    "npm:@better-auth/drizzle-adapter@^1.7.2": "1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_drizzle-orm@0.45.2__kysely@0.29.5_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3",
-    "npm:@coderline/alphatab-vite@1.8.4": "1.8.4_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2",
+    "npm:@better-auth/drizzle-adapter@^1.7.2": "1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_drizzle-orm@0.45.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3",
+    "npm:@coderline/alphatab-vite@1.8.4": "1.8.4_vite@8.2.2_@types+node@26.6.2",
     "npm:@coderline/alphatab@1.8.4": "1.8.4",
     "npm:@fortawesome/fontawesome-svg-core@7.3.1": "7.3.1",
     "npm:@fortawesome/free-regular-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/free-solid-svg-icons@7.3.1": "7.3.1",
-    "npm:@fortawesome/vue-fontawesome@3.3.3": "3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
-    "npm:@hono/node-server@~2.1.1": "2.1.1_hono@4.13.7",
-    "npm:@jaxtheprime/vue3-dropzone@~3.4.5": "3.4.5_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
-    "npm:@kyvg/vue3-notification@~3.4.2": "3.4.2_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
+    "npm:@fortawesome/vue-fontawesome@3.3.3": "3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.42_typescript@7.0.2",
+    "npm:@hono/node-server@~2.1.3": "2.1.3_hono@4.13.7",
+    "npm:@jaxtheprime/vue3-dropzone@~3.4.5": "3.4.5_vue@3.5.42_typescript@7.0.2",
+    "npm:@kyvg/vue3-notification@~3.4.2": "3.4.2_vue@3.5.42_typescript@7.0.2",
     "npm:@modelcontextprotocol/sdk@1.30": "1.30.0_zod@4.6.5",
     "npm:@playwright/test@*": "1.63.0",
     "npm:@playwright/test@1.63.0": "1.63.0",
     "npm:@types/node@^26.6.2": "26.6.2",
-    "npm:@vitejs/plugin-vue@~6.0.8": "6.0.8_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2",
-    "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@7.0.2_vue@3.5.42__typescript@7.0.2",
-    "npm:better-auth@^1.7.5": "1.7.5_drizzle-orm@0.45.2__kysely@0.29.5_vitest@5.0.1__@types+node@26.6.2__vite@8.2.2___@types+node@26.6.2___sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0",
-    "npm:bootstrap-vue-next@1.1": "1.1.0_bootstrap@5.3.8__@popperjs+core@2.11.8_vue@3.5.42__typescript@7.0.2_vue-router@5.3.1__vite@8.2.2___@types+node@26.6.2___sass-embedded@1.104.0__vue@3.5.42___typescript@7.0.2__@types+node@26.6.2_@types+node@26.6.2",
+    "npm:@vitejs/plugin-vue@~6.0.8": "6.0.8_vite@8.2.2_vue@3.5.42_@types+node@26.6.2",
+    "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@7.0.2_vue@3.5.42",
+    "npm:better-auth@^1.7.5": "1.7.5_drizzle-orm@0.45.2_vitest@5.0.1_vue@3.5.42_@types+node@26.6.2_vite@8.2.2",
+    "npm:bootstrap-vue-next@1.1": "1.1.0_bootstrap@5.3.8_vue@3.5.42_vue-router@5.3.1_@types+node@26.6.2",
     "npm:bootstrap@5.3.8": "5.3.8_@popperjs+core@2.11.8",
     "npm:cheerio@1.2": "1.2.0",
     "npm:concurrently@*": "10.0.3",
@@ -40,11 +40,11 @@
     "npm:sanitize-filename@~1.6.4": "1.6.4",
     "npm:sass-embedded@1.104.0": "1.104.0",
     "npm:typescript@~7.0.2": "7.0.2",
-    "npm:vite-plugin-compression@~0.5.1": "0.5.1_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2",
+    "npm:vite-plugin-compression@~0.5.1": "0.5.1_vite@8.2.2_@types+node@26.6.2",
     "npm:vite@~8.2.2": "8.2.2_@types+node@26.6.2_sass-embedded@1.104.0",
-    "npm:vitest@^5.0.1": "5.0.1_@types+node@26.6.2_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0",
-    "npm:vue-i18n@~11.4.10": "11.4.10_vue@3.5.42__typescript@7.0.2_typescript@7.0.2",
-    "npm:vue-router@~5.3.1": "5.3.1_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2",
+    "npm:vitest@^5.0.1": "5.0.1_@types+node@26.6.2_vite@8.2.2",
+    "npm:vue-i18n@~11.4.10": "11.4.10_vue@3.5.42_typescript@7.0.2",
+    "npm:vue-router@~5.3.1": "5.3.1_vite@8.2.2_vue@3.5.42_@types+node@26.6.2",
     "npm:vue@~3.5.42": "3.5.42_typescript@7.0.2",
     "npm:wait-on@*": "9.1.0",
     "npm:wasm-media-encoders@*": "0.7.0",
@@ -117,7 +117,7 @@
       ],
       "tarball": "http://localhost:4873/@babel/types/-/types-7.29.8.tgz"
     },
-    "@better-auth/core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-kVlSu4H8OKQfjg4b/Zj5MOaospt83N0JbX38wsDzE58Yw95jzovFkU3pxzB1eUFYc4mkuhUMZD8iT1gpUjNMcQ==",
       "dependencies": [
         "@better-auth/utils@0.4.2",
@@ -132,7 +132,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/core/-/core-1.7.5.tgz"
     },
-    "@better-auth/drizzle-adapter@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_drizzle-orm@0.45.2__kysely@0.29.5_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/drizzle-adapter@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_drizzle-orm@0.45.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-9SM7v1735SoaedRDcDbHc5ULgXEd2vUlEJkvRHpMF2Q9qf59TRh1b5A9hryyecyi56bm/0CNUDU3nY0uVWj5/Q==",
       "dependencies": [
         "@better-auth/core",
@@ -144,7 +144,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/drizzle-adapter/-/drizzle-adapter-1.7.5.tgz"
     },
-    "@better-auth/kysely-adapter@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_kysely@0.29.5_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_nanostores@1.5.3": {
+    "@better-auth/kysely-adapter@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_kysely@0.29.5_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_nanostores@1.5.3": {
       "integrity": "sha512-1wE5gvnjW+c1i4GrLtL9HLn3s0Xrq4YneCDan1NO1dpz0mEguLFNlzfnUGykTFrDwvFh2X5rkIbA8ALCj6WzXQ==",
       "dependencies": [
         "@better-auth/core",
@@ -156,7 +156,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/kysely-adapter/-/kysely-adapter-1.7.5.tgz"
     },
-    "@better-auth/memory-adapter@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/memory-adapter@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-YDmnfR9zOXbn5SNYYwfHBPuc19hg1d1C1vUXb+Hm8Q91pTsstFNX5OTlZbo7f28q06FpogAEfGGCN/2QV39cig==",
       "dependencies": [
         "@better-auth/core",
@@ -164,7 +164,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/memory-adapter/-/memory-adapter-1.7.5.tgz"
     },
-    "@better-auth/mongo-adapter@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/mongo-adapter@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-Yq0LfF0VlA9Kfjcjp/v43MSsChv7vKd1ct0Mt15px4zlqaCPIGfPbjw9YNM6jTo0fGpqLR0n15PllSWmLLRp9g==",
       "dependencies": [
         "@better-auth/core",
@@ -172,7 +172,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/mongo-adapter/-/mongo-adapter-1.7.5.tgz"
     },
-    "@better-auth/prisma-adapter@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/prisma-adapter@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-QfW6HS9vK0FMcbI/GsQLdplICxOz0EPzYWGONZT4ovL3cSItd4YH/09USbPPVl+VUQCdznAQIk+n+NKvHdmSag==",
       "dependencies": [
         "@better-auth/core",
@@ -180,7 +180,7 @@
       ],
       "tarball": "http://localhost:4873/@better-auth/prisma-adapter/-/prisma-adapter-1.7.5.tgz"
     },
-    "@better-auth/telemetry@1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0___zod@4.6.5__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0__zod@4.6.5_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
+    "@better-auth/telemetry@1.7.5_@better-auth+core@1.7.5_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-call@1.4.0_jose@6.2.12_kysely@0.29.5_nanostores@1.5.3": {
       "integrity": "sha512-e/REPqMy9Em+gC6G0xWBikiMLRuy532Er7jqdoNkPBa65FbywgWcm1cZbgdW5CnHsrM3OLZsmKn14yeGoDISeg==",
       "dependencies": [
         "@better-auth/core",
@@ -260,7 +260,7 @@
       "cpu": ["x64"],
       "tarball": "http://localhost:4873/@cloudflare/workerd-windows-64/-/workerd-windows-64-1.20260903.1.tgz"
     },
-    "@coderline/alphatab-vite@1.8.4_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2": {
+    "@coderline/alphatab-vite@1.8.4_vite@8.2.2_@types+node@26.6.2": {
       "integrity": "sha512-kUABf0FNMXZrr7TvHLUBTqpQQLrHXs9bIrsQMHHZXE0uIlH70yNSgbiuvm0SK0L5D07On5RD5InteJZIX9dacg==",
       "dependencies": [
         "magic-string@0.30.21",
@@ -478,7 +478,7 @@
       ],
       "tarball": "http://localhost:4873/@fortawesome/free-solid-svg-icons/-/free-solid-svg-icons-7.3.1.tgz"
     },
-    "@fortawesome/vue-fontawesome@3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.42__typescript@7.0.2_typescript@7.0.2": {
+    "@fortawesome/vue-fontawesome@3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.42_typescript@7.0.2": {
       "integrity": "sha512-Jbjze98gGcVBSdkscLbnDlHECumMAFVWDarMtycctn9qL3p92ApnV36VW4PwVrcm9IWrHnnE6ZL9x7MXStSCfA==",
       "dependencies": [
         "@fortawesome/fontawesome-svg-core",
@@ -516,12 +516,12 @@
       ],
       "tarball": "http://localhost:4873/@hapi/topo/-/topo-6.0.2.tgz"
     },
-    "@hono/node-server@2.1.1_hono@4.13.7": {
-      "integrity": "sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==",
+    "@hono/node-server@2.1.3_hono@4.13.7": {
+      "integrity": "sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw==",
       "dependencies": [
         "hono"
       ],
-      "tarball": "http://localhost:4873/@hono/node-server/-/node-server-2.1.1.tgz"
+      "tarball": "http://localhost:4873/@hono/node-server/-/node-server-2.1.3.tgz"
     },
     "@img/colour@1.1.0": {
       "integrity": "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==",
@@ -747,7 +747,7 @@
       "integrity": "sha512-FeImVdPeoSHTm3NBFFZHv0eRP9gQ3F4lj2puDBX5Kw7iiM1uJW6JTf39ian0K/17pbXCI3ef5i9RVsRrALqI6Q==",
       "tarball": "http://localhost:4873/@intlify/shared/-/shared-11.4.10.tgz"
     },
-    "@jaxtheprime/vue3-dropzone@3.4.5_vue@3.5.42__typescript@7.0.2_typescript@7.0.2": {
+    "@jaxtheprime/vue3-dropzone@3.4.5_vue@3.5.42_typescript@7.0.2": {
       "integrity": "sha512-y+hOC20nTgc0VLe/uwyAml2Sq7eTOucM0DTNu9BZCI3uhgIW9vIGEhquE8OwAif8dpn8BZ/4NIX+/0PZfB0P9w==",
       "dependencies": [
         "vue"
@@ -794,7 +794,7 @@
       ],
       "tarball": "http://localhost:4873/@jridgewell/trace-mapping/-/trace-mapping-0.3.9.tgz"
     },
-    "@kyvg/vue3-notification@3.4.2_vue@3.5.42__typescript@7.0.2_typescript@7.0.2": {
+    "@kyvg/vue3-notification@3.4.2_vue@3.5.42_typescript@7.0.2": {
       "integrity": "sha512-CZ2zOdXsbGCtWbdqMgbusKtZTkMT+dYpw9bmAitsdSNHT0knh4njD8X95JIyTMWvNVjhDkFedbkNiZLcPqttwQ==",
       "dependencies": [
         "vue"
@@ -1225,7 +1225,7 @@
       "cpu": ["x64"],
       "tarball": "http://localhost:4873/@typescript/typescript-win32-x64/-/typescript-win32-x64-7.0.2.tgz"
     },
-    "@vitejs/plugin-vue@6.0.8_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2": {
+    "@vitejs/plugin-vue@6.0.8_vite@8.2.2_vue@3.5.42_@types+node@26.6.2": {
       "integrity": "sha512-0ZjgOg7oO6farnNGup7yvoM/YXZV84OZxHAwtflItNa/6zzQyVb5LNxyea3FEKEX2XlagIKzrlH7wwxkKgtiew==",
       "dependencies": [
         "@rolldown/pluginutils",
@@ -1234,7 +1234,7 @@
       ],
       "tarball": "http://localhost:4873/@vitejs/plugin-vue/-/plugin-vue-6.0.8.tgz"
     },
-    "@vitest/mocker@5.0.1_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2": {
+    "@vitest/mocker@5.0.1_vite@8.2.2_@types+node@26.6.2": {
       "integrity": "sha512-6K1DoBNAPGvuOcSsGA4D6x+5zEEff/KmOOP3uetT2TrGpVfI+HRHRnJJfKi5ib/g1vx8IYHQD8s0pbJz8WQI7Q==",
       "dependencies": [
         "@jridgewell/trace-mapping@0.3.31",
@@ -1252,7 +1252,7 @@
       "integrity": "sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==",
       "tarball": "http://localhost:4873/@vitest/spy/-/spy-5.0.1.tgz"
     },
-    "@vue-macros/common@3.1.4_vue@3.5.42__typescript@7.0.2_typescript@7.0.2": {
+    "@vue-macros/common@3.1.4_vue@3.5.42_typescript@7.0.2": {
       "integrity": "sha512-/5Fv+6DgIcM9ajY05ZmKBv+LMX1M9A0X+IUwDRVdt67ciw8OV9bvG2r34p3RiEadlsQybjhKPRKNXDC8Bp23cw==",
       "dependencies": [
         "@vue/compiler-sfc",
@@ -1372,7 +1372,7 @@
       "integrity": "sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g==",
       "tarball": "http://localhost:4873/@vue/shared/-/shared-3.5.42.tgz"
     },
-    "@vue/tsconfig@0.9.1_typescript@7.0.2_vue@3.5.42__typescript@7.0.2": {
+    "@vue/tsconfig@0.9.1_typescript@7.0.2_vue@3.5.42": {
       "integrity": "sha512-buvjm+9NzLCJL29KY1j1991YYJ5e6275OiK+G4jtmfIb+z4POywbdm0wXusT9adVWqe0xqg70TbI7+mRx4uU9w==",
       "dependencies": [
         "typescript",
@@ -1474,7 +1474,7 @@
       ],
       "tarball": "http://localhost:4873/axios/-/axios-1.18.1.tgz"
     },
-    "better-auth@1.7.5_drizzle-orm@0.45.2__kysely@0.29.5_vitest@5.0.1__@types+node@26.6.2__vite@8.2.2___@types+node@26.6.2___sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0": {
+    "better-auth@1.7.5_drizzle-orm@0.45.2_vitest@5.0.1_vue@3.5.42_@types+node@26.6.2_vite@8.2.2": {
       "integrity": "sha512-aKE0Zt2EPTpFvmq4/oATNyG/mAfc6JUqWkW9pzGlrVnzUb0lso7GJ9BPxD6JPhLqYV1a9zOAb0uAz1Q5fm+eHA==",
       "dependencies": [
         "@better-auth/core",
@@ -1546,7 +1546,7 @@
       "integrity": "sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==",
       "tarball": "http://localhost:4873/boolbase/-/boolbase-1.0.0.tgz"
     },
-    "bootstrap-vue-next@1.1.0_bootstrap@5.3.8__@popperjs+core@2.11.8_vue@3.5.42__typescript@7.0.2_vue-router@5.3.1__vite@8.2.2___@types+node@26.6.2___sass-embedded@1.104.0__vue@3.5.42___typescript@7.0.2__@types+node@26.6.2_@types+node@26.6.2": {
+    "bootstrap-vue-next@1.1.0_bootstrap@5.3.8_vue@3.5.42_vue-router@5.3.1_@types+node@26.6.2": {
       "integrity": "sha512-VHLtuvUzko56WKuxgOFL4JvAPdHIQ8hC5Qhuks6MLTNRdISGxqZrQqRN/a5mDWMwcY4Shi6POQ2Kp5PfYvNBAA==",
       "dependencies": [
         "@floating-ui/core",
@@ -3299,7 +3299,7 @@
       ],
       "tarball": "http://localhost:4873/unplugin-utils/-/unplugin-utils-0.3.2.tgz"
     },
-    "unplugin@3.3.0_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2": {
+    "unplugin@3.3.0_vite@8.2.2_@types+node@26.6.2": {
       "integrity": "sha512-qa66K+crbfyE6JK10GjvbJeRrOsuC/JpbnHctfyp/i4oBTxWOzJfRZyDiOk1PtErMFRu8JhsU/wPvOdBNWe5Rg==",
       "dependencies": [
         "@jridgewell/remapping",
@@ -3324,7 +3324,7 @@
       "integrity": "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==",
       "tarball": "http://localhost:4873/vary/-/vary-1.1.2.tgz"
     },
-    "vite-plugin-compression@0.5.1_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_@types+node@26.6.2": {
+    "vite-plugin-compression@0.5.1_vite@8.2.2_@types+node@26.6.2": {
       "integrity": "sha512-5QJKBDc+gNYVqL/skgFAP81Yuzo9R+EAf19d+EtsMF/i8kFUpNi3J/H01QD3Oo8zBQn+NzoCIFkpPLynoOzaJg==",
       "dependencies": [
         "chalk@4.1.2",
@@ -3355,7 +3355,7 @@
       "bin": true,
       "tarball": "http://localhost:4873/vite/-/vite-8.2.2.tgz"
     },
-    "vitest@5.0.1_@types+node@26.6.2_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0": {
+    "vitest@5.0.1_@types+node@26.6.2_vite@8.2.2": {
       "integrity": "sha512-iA95lQbKEkvrtTkdAgnWbXfbipWiiWe/hDl2P5tMi6WFwD76G0NxXAGp/M9EOcYupeGJRr6wppMc7CoA41TQjg==",
       "dependencies": [
         "@types/chai",
@@ -3380,7 +3380,7 @@
       "bin": true,
       "tarball": "http://localhost:4873/vitest/-/vitest-5.0.1.tgz"
     },
-    "vue-i18n@11.4.10_vue@3.5.42__typescript@7.0.2_typescript@7.0.2": {
+    "vue-i18n@11.4.10_vue@3.5.42_typescript@7.0.2": {
       "integrity": "sha512-Lp+BjOxqzOY87DS6Z8KrQrpiTr9IN/Lt4kZEilwyXG2Wrx+AcU6IVsAW92HNXtVcn1HFFPV6ty41p9e/qDpyvg==",
       "dependencies": [
         "@intlify/core-base",
@@ -3391,7 +3391,7 @@
       ],
       "tarball": "http://localhost:4873/vue-i18n/-/vue-i18n-11.4.10.tgz"
     },
-    "vue-router@5.3.1_vite@8.2.2__@types+node@26.6.2__sass-embedded@1.104.0_vue@3.5.42__typescript@7.0.2_@types+node@26.6.2": {
+    "vue-router@5.3.1_vite@8.2.2_vue@3.5.42_@types+node@26.6.2": {
       "integrity": "sha512-GDBZzgmILxA/kFnkFbJjQZdZ2QQbngnIMMuoUcjhZIfH1RGMaPjPwX5ASnV38qamuA9uhO0RDjSBHTDNG2uXyQ==",
       "dependencies": [
         "@vue-macros/common",
@@ -3614,7 +3614,7 @@
       "jsr:@std/fs@~1.0.24",
       "jsr:@std/jsonc@~1.0.2",
       "jsr:@std/path@~1.1.6",
-      "npm:@hono/node-server@~2.1.1",
+      "npm:@hono/node-server@~2.1.3",
       "npm:@modelcontextprotocol/sdk@1.30",
       "npm:better-auth@^1.7.5",
       "npm:cheerio@1.2",
