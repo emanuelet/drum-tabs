@@ -105,6 +105,8 @@ export default defineComponent({
             toolbarAutoHide: false,
             isTextTab: false,
             showDrumNotation: false,
+            showSecondaryControls: false,
+            isYoutubeVideoMinimized: false,
         };
     },
     computed: {
@@ -579,6 +581,18 @@ export default defineComponent({
             trackID = await this.initContainer(tempToken, trackID);
 
             this.setConfig("trackID", trackID);
+        },
+
+        updatePlaybackHighlights() {
+            const score = this.$refs.bassTabContainer;
+            if (!score) return;
+
+            const beatCursor = score.querySelector(".at-cursor-beat");
+            beatCursor?.classList.toggle("invisible", this.setting.cursor === "invisible");
+
+            for (const barCursor of score.querySelectorAll(".at-cursor-bar")) {
+                barCursor.classList.add("enable");
+            }
         },
 
         countIn() {
@@ -2023,9 +2037,10 @@ export default defineComponent({
         <div class="artist-row">
             <h2>{{ tab.artist }}</h2>
             <div class="drum-notation-selector" v-if="isDrum()">
-                <button class="btn btn-outline-secondary" type="button" @click="showDrumNotation = !showDrumNotation" :aria-expanded="showDrumNotation">
+                <button class="btn btn-outline-secondary" type="button" aria-label="Drum notation" title="Drum notation" @click="showDrumNotation = !showDrumNotation"
+                    :aria-expanded="showDrumNotation">
                     <font-awesome-icon :icon='["fas", "drum"]' />
-                    Notation
+                    <span class="drum-notation-label">Notation</span>
                 </button>
                 <div class="drum-notation-tooltip" v-if="showDrumNotation">
                     <strong class="drum-notation-title">DRUMSET</strong>
@@ -2079,11 +2094,6 @@ export default defineComponent({
                     </button>
                 </div>
 
-                <button class="btn btn-warning" @click="playFromHighlightedRange()" v-if="playbackRange">
-                    <font-awesome-icon :icon='["fas", "play"]' />
-                    Restart
-                </button>
-
                 <button class="btn btn-primary" @click="playPause" :class="{ active: playing }">
                     <span v-if="!playing">
                         <font-awesome-icon :icon='["fas", "play"]' />
@@ -2094,69 +2104,82 @@ export default defineComponent({
                         Pause
                     </span>
                 </button>
-                <button class="btn btn-secondary" @click="loop()" :class="{ active: isLooping }">
+
+                <div class="secondary-controls" :class="{ open: showSecondaryControls }">
+                    <button class="btn btn-warning" @click="playFromHighlightedRange()" v-if="playbackRange">
+                    <font-awesome-icon :icon='["fas", "play"]' />
+                    Restart
+                </button>
+
+                    <button class="btn btn-secondary" @click="loop()" :class="{ active: isLooping }">
                     <font-awesome-icon :icon='["fas", "check"]' v-if="isLooping" />
                     <font-awesome-icon :icon='["fas", "repeat"]' v-else />
                     Loop
                 </button>
-                <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn }'>
+                    <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn }'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableCountIn" />
                     <font-awesome-icon :icon='["fas", "list-ol"]' v-else />
                     Count in
                 </button>
-                <button class="btn btn-secondary" @click="metronome()" :class='{ active: enableMetronome, disabled: currentAudio !== "synth" }'>
+                    <button class="btn btn-secondary" @click="metronome()" :class='{ active: enableMetronome, disabled: currentAudio !== "synth" }'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableMetronome" />
                     <font-awesome-icon :icon='["fas", "stopwatch"]' v-else />
                     Metronome
                 </button>
 
-                <div class="speed-selector">
-                    <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
+                    <div class="speed-selector">
+                        <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
                         <font-awesome-icon :icon='["fas", "gauge-high"]' />
                         Speed: {{ formattedBpm }} BPM
                     </button>
-                    <div class="speed-selector-popover" v-if="showSpeedSelector">
-                        <div class="speed-selector-header">
-                            <div class="speed-selector-bpm">
-                                <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
-                                <label class="visually-hidden" for="bpm-input">BPM</label>
-                                <input id="bpm-input" :value="formattedBpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
-                                    @change="setBpm($event.target.value)" />
-                                <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
-                                <span>BPM</span>
-                            </div>
-                            <button class="speed-reset" type="button" :disabled="speed === 100" :title="`Reset to ${tempo} BPM`" @click="speed = 100">
+                        <div class="speed-selector-popover" v-if="showSpeedSelector">
+                            <div class="speed-selector-header">
+                                <div class="speed-selector-bpm">
+                                    <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
+                                    <label class="visually-hidden" for="bpm-input">BPM</label>
+                                    <input id="bpm-input" :value="formattedBpm" type="number" :min="tempo * 0.2" :max="tempo * 2" step="0.01" inputmode="decimal" aria-label="BPM"
+                                        @change="setBpm($event.target.value)" />
+                                    <button type="button" aria-label="Increase tempo" @click="adjustBpm(1)">+</button>
+                                    <span>BPM</span>
+                                </div>
+                                <button class="speed-reset" type="button" :disabled="speed === 100" :title="`Reset to ${tempo} BPM`" @click="speed = 100">
                                 <font-awesome-icon icon="rotate-left" /> Reset
                             </button>
-                        </div>
-                        <div class="speed-scale">
-                            <button v-for="mark in speedMarks" :key="mark" class="speed-mark" type="button" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }"
-                                :aria-label="`Set playback speed to ${mark}%`" @click="speed = mark">{{ mark }}</button>
-                            <div class="speed-ticks" aria-hidden="true">
-                                <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
                             </div>
-                            <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
-                            <span class="speed-unit">%</span>
+                            <div class="speed-scale">
+                                <button v-for="mark in speedMarks" :key="mark" class="speed-mark" type="button" :class="{ active: speed === mark }" :style="{ left: speedMarkPosition(mark) }"
+                                    :aria-label="`Set playback speed to ${mark}%`" @click="speed = mark">{{ mark }}</button>
+                                <div class="speed-ticks" aria-hidden="true">
+                                    <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
+                                </div>
+                                <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
+                                <span class="speed-unit">%</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="zoom-selector">
-                    <button class="btn btn-secondary" type="button" aria-label="Zoom out" :disabled="tabScale <= 0.5" @click="adjustTabScale(-0.1)">
-                        <font-awesome-icon :icon='["fas", "magnifying-glass-minus"]' />
-                    </button>
-                    <span>Zoom {{ Math.round(tabScale * 100) }}%</span>
-                    <button class="btn btn-secondary" type="button" aria-label="Zoom in" :disabled="tabScale >= 3" @click="adjustTabScale(0.1)">
-                        <font-awesome-icon :icon='["fas", "magnifying-glass-plus"]' />
-                    </button>
-                </div>
+                    <div class="zoom-selector">
+                        <button class="btn btn-secondary" type="button" aria-label="Zoom out" :disabled="tabScale <= 0.5" @click="adjustTabScale(-0.1)">
+                            <font-awesome-icon :icon='["fas", "magnifying-glass-minus"]' />
+                        </button>
+                        <span>Zoom {{ Math.round(tabScale * 100) }}%</span>
+                        <button class="btn btn-secondary" type="button" aria-label="Zoom in" :disabled="tabScale >= 3" @click="adjustTabScale(0.1)">
+                            <font-awesome-icon :icon='["fas", "magnifying-glass-plus"]' />
+                        </button>
+                    </div>
 
-                <div class="btn-edit" v-if="isLoggedIn">
-                    <button class="btn btn-secondary" @click="edit()">
+                    <div class="btn-edit" v-if="isLoggedIn">
+                        <button class="btn btn-secondary" @click="edit()">
                         <font-awesome-icon :icon='["fas", "pen"]' />
                         Edit
                     </button>
+                    </div>
                 </div>
+
+                <button class="btn btn-secondary secondary-controls-toggle" type="button" :aria-expanded="showSecondaryControls" @click="showSecondaryControls = !showSecondaryControls">
+                    <font-awesome-icon :icon='["fas", "ellipsis"]' />
+                    More
+                </button>
             </div>
 
             <div class="track-list list" v-if="showTrackList" ref="trackList">
@@ -2307,7 +2330,14 @@ export default defineComponent({
                         </div>
                         <button class="btn btn-success youtube-sync-save" type="button" @click="saveYoutubeSyncPoints">Save Sync</button>
                     </div>
-                    <div ref="youtube" class="player"></div>
+                    <div class="youtube-video" :class="{ minimized: isYoutubeVideoMinimized }">
+                        <button class="youtube-video-toggle" type="button" :aria-expanded="!isYoutubeVideoMinimized" :title="isYoutubeVideoMinimized ? 'Show video' : 'Minimize video'"
+                            @click="isYoutubeVideoMinimized = !isYoutubeVideoMinimized">
+                            <font-awesome-icon :icon='["fas", isYoutubeVideoMinimized ? "up-right-and-down-left-from-center" : "down-left-and-up-right-to-center"]' />
+                            {{ isYoutubeVideoMinimized ? "Show video" : "Minimize video" }}
+                        </button>
+                        <div v-show="!isYoutubeVideoMinimized" ref="youtube" class="player"></div>
+                    </div>
                 </div>
 
                 <!-- Audio Player -->
@@ -2400,6 +2430,14 @@ $youtube-height: 200px;
                 color: white;
             }
         }
+
+        .secondary-controls-toggle {
+            display: none;
+        }
+
+        .secondary-controls {
+            display: contents;
+        }
     }
 
     .player-container {
@@ -2438,7 +2476,9 @@ $youtube-height: 200px;
             align-items: flex-start;
             gap: 8px;
             box-sizing: border-box;
-            height: 180px;
+            width: min(560px, calc(100vw - 352px));
+            min-height: 180px;
+            max-height: calc(100vh - 120px);
             padding: 8px 40px 8px 8px;
             color: white;
             background-color: $dark1;
@@ -2487,9 +2527,9 @@ $youtube-height: 200px;
 
         .youtube-sync-points {
             display: flex;
+            flex-wrap: wrap;
             max-width: 100%;
             gap: 4px;
-            overflow-x: auto;
         }
 
         .youtube-sync-diagnostics,
@@ -2500,9 +2540,8 @@ $youtube-height: 200px;
 
         .youtube-sync-diagnostics {
             display: flex;
+            flex-wrap: wrap;
             gap: 8px;
-            overflow-x: auto;
-            white-space: nowrap;
 
             .warning {
                 color: #f8d84d;
@@ -2512,9 +2551,8 @@ $youtube-height: 200px;
         .youtube-sync-suggestions {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 4px;
-            overflow-x: auto;
-            white-space: nowrap;
 
             button {
                 padding: 2px 5px;
@@ -2567,6 +2605,82 @@ $youtube-height: 200px;
         .youtube-player {
             display: flex;
             align-items: end;
+
+            .youtube-video {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+
+            .youtube-video-toggle {
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                z-index: 1;
+                padding: 5px 9px;
+                color: white;
+                font-size: 13px;
+                background: rgb(33 37 41 / 85%);
+                border: 1px solid rgb(255 255 255 / 45%);
+                border-radius: 4px;
+            }
+
+            .youtube-video.minimized {
+                width: 320px;
+                height: 40px;
+                background: #212529;
+            }
+        }
+    }
+}
+
+@media (max-width: 1024px) {
+    .toolbar {
+        .scroll {
+            position: static;
+            overflow: visible;
+            justify-content: space-between;
+            gap: 8px;
+
+            .track-selector,
+            .audio-selector {
+                min-width: 0;
+
+                .button {
+                    max-width: 140px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+            }
+
+            .secondary-controls {
+                position: absolute;
+                right: 0;
+                bottom: 100%;
+                left: 0;
+                display: none;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 12px 16px;
+                background: #212529;
+                border-top: 1px solid #3c3b40;
+                box-shadow: 0 -8px 16px rgb(0 0 0 / 18%);
+
+                &.open {
+                    display: flex;
+                }
+
+                .btn-edit {
+                    flex-grow: 0;
+                }
+            }
+
+            .secondary-controls-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
         }
     }
 }
@@ -3229,6 +3343,11 @@ $padding: 20px;
         }
 
         .player-container {
+            position: absolute;
+            top: auto;
+            bottom: 100%;
+            right: 0;
+
             .sync-offset {
                 display: none;
             }
@@ -3240,6 +3359,7 @@ $padding: 20px;
             .youtube-sync-editor {
                 height: auto;
                 min-height: 180px;
+                width: calc(100vw - 32px);
             }
 
             .youtube-player {
@@ -3270,6 +3390,16 @@ $padding: 20px;
         right: auto;
         left: 50%;
         transform: translateX(-50%);
+    }
+
+    .drum-notation-selector > .btn {
+        width: 48px;
+        padding-right: 0;
+        padding-left: 0;
+
+        .drum-notation-label {
+            display: none;
+        }
     }
 }
 
