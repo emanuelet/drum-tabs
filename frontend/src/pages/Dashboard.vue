@@ -18,6 +18,7 @@ export default defineComponent({
             isLoggedIn: false,
             ready: false,
             fixedNavbar: false,
+            mobileMenuOpen: false,
             user: null,
         };
     },
@@ -32,6 +33,7 @@ export default defineComponent({
     watch: {
         $route() {
             this.fixedNavbar = false;
+            this.mobileMenuOpen = false;
         },
     },
     methods: {
@@ -53,7 +55,9 @@ export default defineComponent({
         <div class="my-navbar">
             <Logo />
 
-            <div class="toolbar">
+            <button class="mobile-menu-toggle" type="button" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">Menu</button>
+
+            <div class="toolbar" :class="{ open: mobileMenuOpen }">
                 <div class="left" v-show="ready">
                     <router-link to="/" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "folder"]' />
@@ -169,6 +173,10 @@ $navHeight: 100px;
             font-size: 20px;
         }
     }
+
+    .mobile-menu-toggle {
+        display: none;
+    }
 }
 
 .fixed-navbar {
@@ -179,6 +187,7 @@ $navHeight: 100px;
     $navHeightMobile: 75px;
 
     .my-navbar {
+        position: relative;
         height: $navHeightMobile;
 
         .navbar-brand {
@@ -188,11 +197,37 @@ $navHeight: 100px;
         }
 
         .toolbar {
-            padding: 0 0 0 10px;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            left: 0;
+            z-index: 1;
+            display: none;
+            padding: 12px;
+            background-color: #212529;
+            border-bottom: 1px solid #3c3b40;
+
+            &.open {
+                display: flex;
+            }
 
             & > div {
-                column-gap: 10px;
+                flex: 1;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 16px;
             }
+        }
+
+        .mobile-menu-toggle {
+            display: block;
+            margin-left: auto;
+            margin-right: 12px;
+            padding: 6px 10px;
+            color: inherit;
+            background: transparent;
+            border: 1px solid currentColor;
+            border-radius: 4px;
         }
     }
 

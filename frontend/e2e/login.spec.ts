@@ -33,4 +33,23 @@ test("accepts a six-digit PIN across grouped inputs", async ({ page }) => {
     for (const [index, value] of ["9", "8", "7", "6", "5", "4"].entries()) {
         await expect(digits.nth(index)).toHaveValue(value);
     }
+
+    await page.locator('input[name="password"]').fill("987654");
+    for (const [index, value] of ["9", "8", "7", "6", "5", "4"].entries()) {
+        await expect(digits.nth(index)).toHaveValue(value);
+    }
+});
+
+test("opens navigation links from the mobile menu", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/");
+
+    const menu = page.getByRole("button", { name: "Menu" });
+    await expect(menu).toBeVisible();
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await menu.click();
+    await expect(menu).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Drum Metronome" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
 });

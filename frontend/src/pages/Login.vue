@@ -94,7 +94,7 @@ export default defineComponent({
                 </div>
 
                 <div class="form-floating mt-3">
-                    <input id="floatingInput" v-model="email" type="email" class="form-control" :placeholder='$t("Username")' required>
+                    <input id="floatingInput" v-model="email" name="username" type="email" autocomplete="username" class="form-control" :placeholder='$t("Username")' required>
                     <label for="floatingInput">{{ $t("Email") }}</label>
                 </div>
 
@@ -108,14 +108,16 @@ export default defineComponent({
                             ref="pinInputs"
                             :value="pinDigits[index]"
                             type="password"
+                            :name="index === 0 ? 'password' : undefined"
                             inputmode="numeric"
                             pattern="[0-9]*"
-                            maxlength="1"
-                            :autocomplete="index === 0 ? 'one-time-code' : 'off'"
+                            :maxlength="index === 0 ? 6 : 1"
+                            :autocomplete="index === 0 ? 'current-password' : 'off'"
                             :aria-label="`PIN digit ${index + 1}`"
                             class="form-control pin-input"
                             required
                             @input="onPinInput(index, $event)"
+                            @change="onPinInput(index, $event)"
                             @paste="onPinPaste(index, $event)"
                             @keydown="onPinKeydown(index, $event)"
                         >
