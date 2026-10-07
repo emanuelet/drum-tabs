@@ -16,6 +16,7 @@
     "npm:@coderline/alphatab-vite@1.8.4": "1.8.4_vite@8.2.2_@types+node@26.6.2",
     "npm:@coderline/alphatab@1.8.4": "1.8.4",
     "npm:@fortawesome/fontawesome-svg-core@7.3.1": "7.3.1",
+    "npm:@fortawesome/free-brands-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/free-regular-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/free-solid-svg-icons@7.3.1": "7.3.1",
     "npm:@fortawesome/vue-fontawesome@3.3.3": "3.3.3_@fortawesome+fontawesome-svg-core@7.3.1_vue@3.5.42_typescript@7.0.2",
@@ -41,6 +42,7 @@
     "npm:sass-embedded@1.104.0": "1.104.0",
     "npm:typescript@~7.0.2": "7.0.2",
     "npm:vite-plugin-compression@~0.5.1": "0.5.1_vite@8.2.2_@types+node@26.6.2",
+    "npm:vite@*": "8.2.2_@types+node@26.6.2_sass-embedded@1.104.0",
     "npm:vite@~8.2.2": "8.2.2_@types+node@26.6.2_sass-embedded@1.104.0",
     "npm:vitest@^5.0.1": "5.0.1_@types+node@26.6.2_vite@8.2.2",
     "npm:vue-i18n@~11.4.10": "11.4.10_vue@3.5.42_typescript@7.0.2",
@@ -463,6 +465,13 @@
         "@fortawesome/fontawesome-common-types"
       ],
       "tarball": "http://localhost:4873/@fortawesome/fontawesome-svg-core/-/fontawesome-svg-core-7.3.1.tgz"
+    },
+    "@fortawesome/free-brands-svg-icons@7.3.1": {
+      "integrity": "sha512-8eiNzycuFhy3mZsi5EVO8JpO3H8l7/kSCl4Gk4iUew9hJuzYFqAAD6kqgeEup3+YZ9hL+5cjjorGzrRLkYuURg==",
+      "dependencies": [
+        "@fortawesome/fontawesome-common-types"
+      ],
+      "tarball": "http://localhost:4873/@fortawesome/free-brands-svg-icons/-/free-brands-svg-icons-7.3.1.tgz"
     },
     "@fortawesome/free-regular-svg-icons@7.3.1": {
       "integrity": "sha512-q1EsmL7Q8DDnkRBUjSvrxbq7c9oVwwVjCn/xa5apKmdp65YSgzUg2y0Ltnd5aDbT6GdAQQdXql5Ha90ArqIReQ==",
@@ -3646,6 +3655,7 @@
             "npm:@coderline/alphatab-vite@1.8.4",
             "npm:@coderline/alphatab@1.8.4",
             "npm:@fortawesome/fontawesome-svg-core@7.3.1",
+            "npm:@fortawesome/free-brands-svg-icons@7.3.1",
             "npm:@fortawesome/free-regular-svg-icons@7.3.1",
             "npm:@fortawesome/free-solid-svg-icons@7.3.1",
             "npm:@fortawesome/vue-fontawesome@3.3.3",

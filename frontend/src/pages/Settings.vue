@@ -3,6 +3,7 @@ import { defineComponent } from "vue";
 import { SettingSchema } from "../zod.ts";
 import { baseURL, checkFetch, generalError, getSetting, successMessage } from "../app.js";
 import { ScrollMode } from "@coderline/alphatab";
+import { confirmAction } from "../confirm.ts";
 
 export default defineComponent({
     computed: {
@@ -24,18 +25,55 @@ export default defineComponent({
                 toolbarAutoHide: false,
             },
             isProcessing: false,
+            activeTab: "player",
+            tabs: [
+                { id: "player", label: "Tab Player" },
+                { id: "assists", label: "Assists" },
+                { id: "ultimate-guitar", label: "Ultimate Guitar" },
+                { id: "others", label: "Others" },
+            ],
             ultimateGuitarCookie: localStorage.getItem("ultimateGuitarCookie") || "",
         };
     },
     mounted() {
         this.setting = getSetting();
+        const initial = String(this.$route.query.tab || "");
+        if (this.tabs.some((tab) => tab.id === initial)) {
+            this.activeTab = initial;
+        }
     },
     methods: {
+        selectTab(id: string) {
+            this.activeTab = id;
+            this.$router.replace({ query: { ...this.$route.query, tab: id } });
+        },
+
+        /**
+         * Arrow-key navigation between tabs (WAI-ARIA tabs pattern)
+         */
+        onTabKeydown(e: KeyboardEvent, index: number) {
+            const last = this.tabs.length - 1;
+            let next = -1;
+            if (e.key === "ArrowRight") next = index === last ? 0 : index + 1;
+            else if (e.key === "ArrowLeft") next = index === 0 ? last : index - 1;
+            else if (e.key === "Home") next = 0;
+            else if (e.key === "End") next = last;
+            if (next < 0) return;
+            e.preventDefault();
+            this.selectTab(this.tabs[next].id);
+            this.$nextTick(() => document.getElementById(`settings-tab-${this.tabs[next].id}`)?.focus());
+        },
+
         /**
          * Load the setting from the server
          */
         async loadFromServer() {
-            const ok = window.confirm("This will overwrite your local settings. Are you sure?");
+            const ok = await confirmAction({
+                title: "Load settings from server?",
+                message: "This will overwrite your local settings.",
+                confirmText: "Load",
+                danger: false,
+            });
             if (!ok) {
                 return;
             }
@@ -63,7 +101,11 @@ export default defineComponent({
          * Save the current setting to the server.
          */
         async saveToServer() {
-            const ok = window.confirm("This will overwrite the settings stored on the server. Are you sure?");
+            const ok = await confirmAction({
+                title: "Save settings to server?",
+                message: "This will overwrite the settings stored on the server.",
+                confirmText: "Save",
+            });
             if (!ok) {
                 return;
             }
@@ -92,7 +134,11 @@ export default defineComponent({
          * Reset local/client settings to default values
          */
         async resetToDefault() {
-            const ok = window.confirm("Are you sure you want to reset your local settings? This will not affect the settings stored on the server.");
+            const ok = await confirmAction({
+                title: "Reset local settings?",
+                message: "This resets your local settings to their defaults. Settings stored on the server are not affected.",
+                confirmText: "Reset",
+            });
             if (!ok) {
                 return;
             }
@@ -131,124 +177,168 @@ export default defineComponent({
     <div class="container my-container">
         <h1 class="mb-3">Settings</h1>
 
-        <h2 class="mt-4 mb-4">Tab Player</h2>
+        <ul class="nav nav-tabs settings-tabs mb-4" role="tablist" aria-label="Settings sections">
+            <li v-for="(tab, index) in tabs" :key="tab.id" class="nav-item" role="presentation">
+                <button :id="`settings-tab-${tab.id}`" class="nav-link" :class="{ active: activeTab === tab.id }" type="button" role="tab" :aria-selected="activeTab === tab.id"
+                    :aria-controls="`settings-panel-${tab.id}`" :tabindex="activeTab === tab.id ? 0 : -1" @click="selectTab(tab.id)" @keydown="onTabKeydown($event, index)">
+                    {{ tab.label }}
+                </button>
+            </li>
+        </ul>
 
-        <!--     scoreStyle: z.enum(["tab", "score-tab", "score"]).default("tab"), -->
-        <div class="mb-3">
-            <label for="scoreStyle" class="form-label">Style</label>
-            <select id="scoreStyle" class="form-select" v-model="setting.scoreStyle">
-                <option value="tab">Tab</option>
-                <option value="score">Score</option>
-                <option value="score-tab">Tab + Score</option>
-                <option value="horizontal-tab">Horizontal Tab</option>
-            </select>
-        </div>
-
-        <!-- Score Color Dropdown -->
-        <div class="mb-3">
-            <span class="form-label d-block">Tab/Score Color</span>
-            <div class="btn-group" role="group" aria-label="Tab and score color">
-                <button type="button" class="btn" :class="setting.scoreColor === 'light' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.scoreColor = 'light'">Light</button>
-                <button type="button" class="btn" :class="setting.scoreColor === 'dark' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.scoreColor = 'dark'">Dark</button>
+        <section id="settings-panel-player" v-show="activeTab === 'player'" role="tabpanel" aria-labelledby="settings-tab-player">
+            <!--     scoreStyle: z.enum(["tab", "score-tab", "score"]).default("tab"), -->
+            <div class="mb-3">
+                <label for="scoreStyle" class="form-label">Style</label>
+                <select id="scoreStyle" class="form-select" v-model="setting.scoreStyle">
+                    <option value="tab">Tab</option>
+                    <option value="score">Score</option>
+                    <option value="score-tab">Tab + Score</option>
+                    <option value="horizontal-tab">Horizontal Tab</option>
+                </select>
             </div>
-        </div>
 
-        <!-- Tab/Score Display Scale -->
-        <div class="mb-3">
-            <label for="scale" class="form-label">Tab/Score Display Scale</label>
-            <select id="scale" class="form-select" v-model.number="setting.scale">
-                <option :value="0.8">80%</option>
-                <option :value="1">100%</option>
-                <option :value="1.1">110%</option>
-                <option :value="1.2">120%</option>
-                <option :value="1.3">130%</option>
-                <option :value="1.4">140%</option>
-                <option :value="1.5">150%</option>
-                <option :value="2">200%</option>
-                <option :value="3">300%</option>
-            </select>
-        </div>
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">Tab/Score Color</legend>
+                <div class="btn-group toggle-group" role="group">
+                    <input id="scoreColor-0" v-model="setting.scoreColor" type="radio" class="btn-check" name="scoreColor" :value="'light'">
+                    <label class="btn btn-outline-secondary" for="scoreColor-0">Light</label>
+                    <input id="scoreColor-1" v-model="setting.scoreColor" type="radio" class="btn-check" name="scoreColor" :value="'dark'">
+                    <label class="btn btn-outline-secondary" for="scoreColor-1">Dark</label>
+                </div>
+            </fieldset>
 
-        <!-- Scroll Mode -->
-        <div class="mb-3">
-            <span class="form-label d-block">
+            <!-- Default zoom -->
+            <div class="mb-3">
+                <label for="scale" class="form-label">Default Zoom</label>
+                <select id="scale" class="form-select" v-model.number="setting.scale">
+                    <option :value="0.8">80%</option>
+                    <option :value="1">100%</option>
+                    <option :value="1.1">110%</option>
+                    <option :value="1.2">120%</option>
+                    <option :value="1.3">130%</option>
+                    <option :value="1.4">140%</option>
+                    <option :value="1.5">150%</option>
+                    <option :value="2">200%</option>
+                    <option :value="3">300%</option>
+                </select>
+            </div>
+
+            <!-- Scroll Mode -->
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">
                 Scroll
                 <span v-if='setting.scoreStyle === "horizontal-tab"'> (Force Smooth Scroll for Horizontal Tab)</span>
-            </span>
-            <div class="btn-group" role="group" aria-label="Scroll mode">
-                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Continuous ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
-                    @click="setting.scrollMode = ScrollMode.Continuous">Scroll</button>
-                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Off ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
-                    @click="setting.scrollMode = ScrollMode.Off">Off</button>
-                <button type="button" class="btn" :class="setting.scrollMode === ScrollMode.Smooth ? 'btn-primary' : 'btn-outline-secondary'" :disabled='setting.scoreStyle === "horizontal-tab"'
-                    @click="setting.scrollMode = ScrollMode.Smooth">Smooth Scroll</button>
+            </legend>
+                <div class="btn-group toggle-group" role="group">
+                    <input id="scroll-0" v-model="setting.scrollMode" type="radio" class="btn-check" name="scrollMode" :value="ScrollMode.Continuous"
+                        :disabled='setting.scoreStyle === "horizontal-tab"'>
+                    <label class="btn btn-outline-secondary" for="scroll-0">Scroll</label>
+                    <input id="scroll-1" v-model="setting.scrollMode" type="radio" class="btn-check" name="scrollMode" :value="ScrollMode.Off" :disabled='setting.scoreStyle === "horizontal-tab"'>
+                    <label class="btn btn-outline-secondary" for="scroll-1">Off</label>
+                    <input id="scroll-2" v-model="setting.scrollMode" type="radio" class="btn-check" name="scrollMode" :value="ScrollMode.Smooth" :disabled='setting.scoreStyle === "horizontal-tab"'>
+                    <label class="btn btn-outline-secondary" for="scroll-2">Smooth Scroll</label>
+                </div>
+            </fieldset>
+
+            <!-- Show Key Signature -->
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">Show Key Signature</legend>
+                <div class="btn-group toggle-group" role="group">
+                    <input id="keySig-0" v-model="setting.showKeySignature" type="radio" class="btn-check" name="showKeySignature" :value="true">
+                    <label class="btn btn-outline-secondary" for="keySig-0">Yes</label>
+                    <input id="keySig-1" v-model="setting.showKeySignature" type="radio" class="btn-check" name="showKeySignature" :value="false">
+                    <label class="btn btn-outline-secondary" for="keySig-1">No</label>
+                </div>
+            </fieldset>
+
+            <!-- Toolbar Auto-hide -->
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">Auto-hide bottom toolbar</legend>
+                <div class="btn-group toggle-group" role="group">
+                    <input id="autoHide-0" v-model="setting.toolbarAutoHide" type="radio" class="btn-check" name="toolbarAutoHide" :value="true">
+                    <label class="btn btn-outline-secondary" for="autoHide-0">Yes</label>
+                    <input id="autoHide-1" v-model="setting.toolbarAutoHide" type="radio" class="btn-check" name="toolbarAutoHide" :value="false">
+                    <label class="btn btn-outline-secondary" for="autoHide-1">No</label>
+                </div>
+            </fieldset>
+        </section>
+
+        <section id="settings-panel-assists" v-show="activeTab === 'assists'" role="tabpanel" aria-labelledby="settings-tab-assists">
+            <!-- Note Color refer to SettingSchema   noteColor: z.enum(["rocksmith", "none"]).default("none"), -->
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">Note Color</legend>
+                <div class="btn-group toggle-group" role="group">
+                    <input id="noteColor-0" v-model="setting.noteColor" type="radio" class="btn-check" name="noteColor" :value="'none'">
+                    <label class="btn btn-outline-secondary" for="noteColor-0">No Color</label>
+                    <input id="noteColor-1" v-model="setting.noteColor" type="radio" class="btn-check" name="noteColor" :value="'rocksmith'">
+                    <label class="btn btn-outline-secondary" for="noteColor-1">Rocksmith 2014</label>
+                    <input id="noteColor-2" v-model="setting.noteColor" type="radio" class="btn-check" name="noteColor" :value="'louis-bass-v'">
+                    <label class="btn btn-outline-secondary" for="noteColor-2">Louis' 5-string Bass</label>
+                </div>
+            </fieldset>
+
+            <!--     cursor: z.enum(["animated", "instant", "bar", "invisible"]).default("animated"),-->
+            <div class="mb-3">
+                <label for="cursor" class="form-label">Cursor Style</label>
+                <select id="cursor" class="form-select" v-model="setting.cursor">
+                    <option value="invisible">No Cursor</option>
+                    <option value="animated">Cursor (Smooth)</option>
+                    <option value="instant">Cursor (Instant)</option>
+                    <option value="bar">Bar</option>
+                </select>
             </div>
-        </div>
 
-        <!-- Show Key Signature -->
-        <div class="mb-3">
-            <span class="form-label d-block">Show Key Signature</span>
-            <div class="btn-group" role="group" aria-label="Show key signature">
-                <button type="button" class="btn" :class="setting.showKeySignature ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.showKeySignature = true">Yes</button>
-                <button type="button" class="btn" :class="!setting.showKeySignature ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.showKeySignature = false">No</button>
+            <p class="text-dt-muted">Tips: If you want to check if the sync points is correct, "Cursor (Instant)" is a good indicator.</p>
+        </section>
+
+        <section id="settings-panel-ultimate-guitar" v-show="activeTab === 'ultimate-guitar'" role="tabpanel" aria-labelledby="settings-tab-ultimate-guitar">
+            <div class="mb-3">
+                <h2 class="h5">What this does</h2>
+                <p>
+                Adds an Ultimate Guitar search to the <router-link :to="{ name: 'tabNew' }">New Tab</router-link> page. You can search by artist or song, preview a result, and import it into your library as either a
+                Guitar Pro file with a drum track or an ASCII drum tab. Imported tabs behave like any other uploaded tab.
+            </p>
+                <h2 class="h5">Why a cookie is needed</h2>
+                <p>
+                Searches and downloads are made with your own Ultimate Guitar login session. This server forwards your cookie with each request and never stores it. It is kept only in this browser.
+            </p>
+                <h2 class="h5">How to get it</h2>
+                <ol>
+                    <li>Log in at ultimate-guitar.com in your browser.</li>
+                    <li>Open developer tools (F12) and go to the Network tab.</li>
+                    <li>Reload the page and click any request to ultimate-guitar.com.</li>
+                    <li>Copy the whole <code>Cookie</code> value from the request headers and paste it below.</li>
+                </ol>
+
+                <label for="ultimateGuitarCookie" class="form-label">Cookie header</label>
+                <input id="ultimateGuitarCookie" v-model="ultimateGuitarCookie" type="password" class="form-control" autocomplete="off" aria-describedby="ugCookieHelp"
+                    @change="saveUltimateGuitarCookie" />
+                <div id="ugCookieHelp" class="form-text text-dt-muted">Stored only in this browser and sent only with Ultimate Guitar requests.</div>
             </div>
-        </div>
+        </section>
 
-        <!-- Toolbar Auto-hide -->
-        <div class="mb-3">
-            <span class="form-label d-block">Auto-hide bottom toolbar</span>
-            <div class="btn-group" role="group" aria-label="Auto-hide bottom toolbar">
-                <button type="button" class="btn" :class="!setting.toolbarAutoHide ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.toolbarAutoHide = false">No</button>
-                <button type="button" class="btn" :class="setting.toolbarAutoHide ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.toolbarAutoHide = true">Yes</button>
+        <section id="settings-panel-others" v-show="activeTab === 'others'" role="tabpanel" aria-labelledby="settings-tab-others">
+            <div class="mb-3" role="group" aria-labelledby="serverSyncLabel">
+                <div id="serverSyncLabel" class="form-label">Load/Save Settings to Server</div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-secondary touch-target" :disabled="isProcessing" @click.prevent="loadFromServer">Load from Server</button>
+                    <button class="btn btn-success touch-target" :disabled="isProcessing" @click.prevent="saveToServer">Save to Server</button>
+                    <button class="btn btn-outline-danger touch-target" :disabled="isProcessing" @click.prevent="resetToDefault">Reset Local</button>
+                </div>
             </div>
-        </div>
-
-        <h2 class="mt-5 mb-4">Assists</h2>
-
-        <!-- Note Color refer to SettingSchema   noteColor: z.enum(["rocksmith", "none"]).default("none"), -->
-        <div class="mb-3">
-            <span class="form-label d-block">Note Color</span>
-            <div class="btn-group" role="group" aria-label="Note color">
-                <button type="button" class="btn" :class="setting.noteColor === 'none' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.noteColor = 'none'">No Color</button>
-                <button type="button" class="btn" :class="setting.noteColor === 'rocksmith' ? 'btn-primary' : 'btn-outline-secondary'" @click="setting.noteColor = 'rocksmith'">Rocksmith 2014</button>
-                <button type="button" class="btn" :class="setting.noteColor === 'louis-bass-v' ? 'btn-primary' : 'btn-outline-secondary'"
-                    @click="setting.noteColor = 'louis-bass-v'">Louis' 5-string Bass</button>
-            </div>
-        </div>
-
-        <!--     cursor: z.enum(["animated", "instant", "bar", "invisible"]).default("animated"),-->
-        <div class="mb-3">
-            <label for="cursor" class="form-label">Cursor Style</label>
-            <select id="cursor" class="form-select" v-model="setting.cursor">
-                <option value="invisible">No Cursor</option>
-                <option value="animated">Cursor (Smooth)</option>
-                <option value="instant">Cursor (Instant)</option>
-                <option value="bar">Bar</option>
-            </select>
-        </div>
-
-        <p class="text-secondary">Tips: If you want to check if the sync points is correct, "Cursor (Instant)" is a good indicator.</p>
-
-        <h2 class="mt-5 mb-4">Ultimate Guitar</h2>
-
-        <div class="mb-3">
-            <label for="ultimateGuitarCookie" class="form-label">Cookie header</label>
-            <input id="ultimateGuitarCookie" v-model="ultimateGuitarCookie" type="password" class="form-control" autocomplete="off" @change="saveUltimateGuitarCookie" />
-            <div class="form-text">Stored only in this browser and sent only with Ultimate Guitar requests.</div>
-        </div>
-
-        <h2 class="mt-5 mb-4">Others</h2>
-
-        <div class="mb-3">
-            <label class="form-label">Load/Save Settings to Server</label>
-
-            <div class="d-flex gap-2">
-                <button class="btn btn-secondary" :disabled="isProcessing" @click.prevent="loadFromServer">Load from Server</button>
-                <button class="btn btn-secondary" :disabled="isProcessing" @click.prevent="saveToServer">Save to Server</button>
-                <button class="btn btn-danger" :disabled="isProcessing" @click.prevent="resetToDefault">Reset Local</button>
-            </div>
-        </div>
+        </section>
     </div>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.settings-tabs {
+    flex-wrap: wrap;
+
+    .nav-link {
+        min-height: 44px;
+        white-space: nowrap;
+    }
+}
+</style>

@@ -7,6 +7,7 @@ import { supportedAudioFormatCommaString, supportedAudioFormatList, supportedFor
 import SyncOptions from "../components/SyncOptions.vue";
 import { FontAwesomeIcon } from "../icon.ts";
 import { parseYoutubeVideoID } from "../youtube.ts";
+import { confirmAction } from "../confirm.ts";
 
 const alphaTab = await import("@coderline/alphatab");
 
@@ -14,6 +15,8 @@ export default defineComponent({
     components: { SyncOptions, Vue3Dropzone, FontAwesomeIcon },
     data() {
         return {
+            baseURL,
+            loadError: "",
             tabID: -1,
             tab: {},
             page: "",
@@ -47,15 +50,19 @@ export default defineComponent({
         this.tabID = this.$route.params.id;
         this.page = this.$route.path.split("/").pop();
 
-        try {
-            await this.load();
-        } catch (e) {
-            generalError(e);
-        }
+        await this.init();
 
         //this.isLocalIP = !!isPrivateIP(window.location.hostname);
     },
     methods: {
+        async init() {
+            this.loadError = "";
+            try {
+                await this.load();
+            } catch (e) {
+                this.loadError = e?.message || "Unable to load this tab";
+            }
+        },
         async load() {
             this.isLoading = true;
             try {
@@ -177,9 +184,12 @@ export default defineComponent({
 
         async removeYoutube(video) {
             try {
-                if (!confirm("Are you sure you want to remove this YouTube video?")) {
-                    return;
-                }
+                const ok = await confirmAction({
+                    title: "Remove YouTube video?",
+                    message: "This removes the video and its sync settings from the tab.",
+                    confirmText: "Remove",
+                });
+                if (!ok) return;
                 const wasSelected = this.selectedYoutubeVideo?.videoID === video.videoID;
 
                 const tabID = this.tab.id;
@@ -312,9 +322,12 @@ export default defineComponent({
 
         async removeAudio(audio) {
             try {
-                if (!confirm("Are you sure you want to remove this audio file?")) {
-                    return;
-                }
+                const ok = await confirmAction({
+                    title: "Remove audio file?",
+                    message: `Remove ${audio.filename} and its sync settings from the tab?`,
+                    confirmText: "Remove",
+                });
+                if (!ok) return;
 
                 const tabID = this.tab.id;
                 const encoded = encodeURIComponent(audio.filename);
@@ -395,244 +408,288 @@ export default defineComponent({
 </script>
 
 <template>
-    <div class="my-container container" v-if="!isLoading">
-        <div class="mt-4 mb-4">
-            <router-link :to="`/tab/${tab.id}`" class="btn btn-primary">
-                <font-awesome-icon :icon='["fas", "arrow-left"]' />
-                Back to Tab
-            </router-link>
+    <div class="my-container container">
+        <div v-if="isLoading" class="state-block" role="status">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading tab...
+        </div>
 
-            <button class="btn btn-secondary ms-2" @click.prevent="openFolder" v-if="showOpenButtons">
-                <font-awesome-icon :icon='["fas", "folder"]' />
-                Open Folder
-            </button>
+        <div v-else-if="loadError" class="state-block" role="alert">
+            <p class="mb-3">{{ loadError }}</p>
+            <button class="btn btn-outline-primary me-2" type="button" @click="init">Retry</button>
+            <router-link to="/" class="btn btn-outline-secondary">Back to Tabs</router-link>
+        </div>
 
-            <button class="btn btn-secondary ms-2" @click.prevent="openExternal" v-if="showOpenButtons">
-                <font-awesome-icon :icon='["fas", "file"]' />
-                Edit with External Tool...
-            </button>
+        <template v-else>
+            <div class="mt-4 mb-4">
+                <div class="d-flex flex-wrap gap-2">
+                    <router-link :to="`/tab/${tab.id}`" class="btn btn-primary icon-btn">
+                    <font-awesome-icon :icon='["fas", "arrow-left"]' />
+                    Back to Tab
+                </router-link>
 
-            <div class="mt-3">
+                    <button class="btn btn-secondary icon-btn" @click.prevent="openFolder" v-if="showOpenButtons">
+                    <font-awesome-icon :icon='["fas", "folder"]' />
+                    Open Folder
+                </button>
+
+                    <button class="btn btn-secondary icon-btn" @click.prevent="openExternal" v-if="showOpenButtons">
+                    <font-awesome-icon :icon='["fas", "file"]' />
+                    Edit with External Tool...
+                </button>
+                </div>
+
+                <h1 class="fs-4 mt-3 mb-0">
                 Editing: {{ tab.artist }} - {{ tab.title }}
+            </h1>
             </div>
-        </div>
 
-        <div class="menu">
-            <div class="btn-group" role="group">
-                <router-link :to="`/tab/${tab.id}/edit/info`" class="btn btn-secondary">Info</router-link>
-                <router-link :to="`/tab/${tab.id}/edit/audio`" class="btn btn-secondary">Youtube & Audio files</router-link>
-                <router-link :to="`/tab/${tab.id}/edit/tab-file`" class="btn btn-secondary">Tab file</router-link>
+            <nav class="menu" aria-label="Edit sections">
+                <router-link :to="`/tab/${tab.id}/edit/info`" class="btn btn-outline-secondary menu-link">Info</router-link>
+                <router-link :to="`/tab/${tab.id}/edit/audio`" class="btn btn-outline-secondary menu-link">YouTube &amp; Audio files</router-link>
+                <router-link :to="`/tab/${tab.id}/edit/tab-file`" class="btn btn-outline-secondary menu-link">Tab file</router-link>
+            </nav>
+
+            <!-- Info Page -->
+            <div v-if='this.page === "info"'>
+                <h2 class="mt-4 mb-4 fs-3">Info</h2>
+                <form>
+                    <!-- Tab Name -->
+                    <div class="mb-3">
+                        <label for="tabName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="tabName" v-model="tab.title">
+                    </div>
+
+                    <!-- Artist -->
+                    <div class="mb-3">
+                        <label for="tabArtist" class="form-label">Artist</label>
+                        <input type="text" class="form-control" id="tabArtist" v-model="tab.artist">
+                    </div>
+
+                    <!-- Public -->
+                    <fieldset class="mb-3">
+                        <legend class="form-label fs-6">Share to public</legend>
+                        <div class="btn-group toggle-group" role="group">
+                            <input id="public-0" v-model="tab.public" type="radio" class="btn-check" name="public" :value="false">
+                            <label class="btn btn-outline-secondary" for="public-0">Private</label>
+                            <input id="public-1" v-model="tab.public" type="radio" class="btn-check" name="public" :value="true">
+                            <label class="btn btn-outline-secondary" for="public-1">Public</label>
+                        </div>
+                    </fieldset>
+
+                    <!-- Save -->
+                    <button type="submit" class="btn btn-success me-2" @click.prevent="submitInfo()">Save</button>
+                </form>
             </div>
-        </div>
 
-        <!-- Info Page -->
-        <div v-if='this.page === "info"'>
-            <h2 class="mt-4 mb-4">Info</h2>
-            <form>
-                <!-- Tab Name -->
-                <div class="mb-3">
-                    <label for="tabName" class="form-label">Name</label>
-                    <input type="text" class="form-control" id="tabName" v-model="tab.title">
-                </div>
+            <!-- Audio Page -->
+            <div v-else-if='this.page === "audio"'>
+                <h2 class="mt-4 mb-2 fs-3">YouTube</h2>
 
-                <!-- Artist -->
-                <div class="mb-3">
-                    <label for="tabArtist" class="form-label">Artist</label>
-                    <input type="text" class="form-control" id="tabArtist" v-model="tab.artist">
-                </div>
+                <!-- Show alert if using a local ip -->
+                <div class="alert alert-info mt-3">
+                Tip: YouTube videos may not work on a private ip (such as 127.0.0.1). Please use <strong>localhost</strong> or other hostname.
+            </div>
 
-                <!-- Public -->
                 <div class="mb-3">
-                    <span class="form-label d-block">Share to public</span>
-                    <div class="btn-group" role="group" aria-label="Share to public">
-                        <button type="button" class="btn" :class="!tab.public ? 'btn-primary' : 'btn-outline-secondary'" @click="tab.public = false">Private</button>
-                        <button type="button" class="btn" :class="tab.public ? 'btn-primary' : 'btn-outline-secondary'" @click="tab.public = true">Public</button>
+                    <label for="basic-url" class="form-label">YouTube URL</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="basic-url" placeholder="" v-model="youtubeURL">
+                        <a v-if="selectedYoutubeVideo" class="btn btn-outline-secondary" :href="youtubeURL" target="_blank" rel="noopener" aria-label="Open selected YouTube video">
+                            <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
+                        </a>
+                        <button class="btn btn-primary" type="button" :disabled="!canUseYoutube" @click.prevent="addYoutube()">Use</button>
                     </div>
                 </div>
 
-                <!-- Save -->
-                <button type="submit" class="btn btn-primary me-2" @click.prevent="submitInfo()">Save</button>
-            </form>
-        </div>
-
-        <!-- Audio Page -->
-        <div v-else-if='this.page === "audio"'>
-            <h3 class="mt-4 mb-2">Youtube</h3>
-
-            <!-- Show alert if using a local ip -->
-            <div class="alert alert-info mt-3" role="alert">
-                Tip: Youtube videos may not work on a private ip (such as 127.0.0.1). Please use <strong>localhost</strong> or other hostname.
-            </div>
-
-            <div class="mb-3">
-                <label for="basic-url" class="form-label">Youtube URL</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="basic-url" placeholder="" v-model="youtubeURL">
-                    <a v-if="selectedYoutubeVideo" class="btn btn-outline-secondary" :href="youtubeURL" target="_blank" rel="noopener" aria-label="Open selected YouTube video">
-                        <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
-                    </a>
-                    <button class="btn btn-primary" type="button" :disabled="!canUseYoutube" @click.prevent="addYoutube()">Use</button>
-                </div>
-            </div>
-
-            <button v-if="showYoutubeSuggestions" class="btn btn-outline-secondary mb-3" type="button" @click="searchYoutube" :disabled="isSearchingYoutube">
+                <button v-if="showYoutubeSuggestions" class="btn btn-outline-secondary mb-3" type="button" @click="searchYoutube" :disabled="isSearchingYoutube">
                 {{ isSearchingYoutube ? "Searching..." : "Find YouTube matches" }}
             </button>
-            <div v-if="youtubeSuggestions.length" class="mb-4 youtube-suggestions">
-                <div v-for="video in youtubeSuggestions" :key="video.videoId" class="suggestion">
-                    <img v-if="video.videoThumbnails?.[1]" :src="video.videoThumbnails[1].url" alt="" />
-                    <div><strong>{{ video.title }}</strong><br /><small>{{ video.author }} · {{ video.lengthSeconds }}s</small></div>
-                    <button class="btn btn-sm btn-primary" type="button" @click="addYoutubeSuggestion(video.videoId)">Use</button>
+                <div v-if="youtubeSuggestions.length" class="mb-4 youtube-suggestions">
+                    <div v-for="video in youtubeSuggestions" :key="video.videoId" class="suggestion">
+                        <img v-if="video.videoThumbnails?.[1]" :src="video.videoThumbnails[1].url" alt="" />
+                        <div><strong>{{ video.title }}</strong><br /><small>{{ video.author }} · {{ video.lengthSeconds }}s</small></div>
+                        <button class="btn btn-sm btn-primary" type="button" @click="addYoutubeSuggestion(video.videoId)">Use</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="mb-4">
-                <!-- Youtube Item -->
-                <div v-for="video in youtubeList" :key="video.id" class="mb-3 pb-5 youtube-item">
-                    <iframe
-                        width="355"
-                        height="200"
-                        :src="`https://www.youtube.com/embed/${video.videoID}`"
-                        title="YouTube video player"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowfullscreen
-                    ></iframe>
-
-                    <div class="info">
-                        <div class="mb-3">
-                            <strong>Video ID:</strong> <a :href="`https://www.youtube.com/watch?v=${video.videoID}`" target="_blank">{{ video.videoID }}</a>
+                <div class="mb-4">
+                    <!-- Youtube Item -->
+                    <div v-for="video in youtubeList" :key="video.id" class="mb-3 pb-5 youtube-item">
+                        <div class="video-frame">
+                            <iframe
+                                :src="`https://www.youtube.com/embed/${video.videoID}`"
+                                :title="`YouTube video ${video.videoID}`"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen
+                            ></iframe>
                         </div>
 
-                        <SyncOptions
-                            :syncMethod="video.syncMethod"
-                            :simpleSync="video.simpleSync"
-                            :advancedSync="video.advancedSync"
-                            @update:syncMethod="video.syncMethod = $event"
-                            @update:simpleSync="video.simpleSync = $event"
-                            @update:advancedSync="video.advancedSync = $event"
-                        />
+                        <div class="info">
+                            <div class="mb-3">
+                            <strong>Video ID:</strong> <a :href="`https://www.youtube.com/watch?v=${video.videoID}`" target="_blank" rel="noopener">{{ video.videoID }}</a>
+                        </div>
 
-                        <div class="btn-group">
-                            <button class="btn btn-primary" @click.prevent="saveYoutube(video)">Save</button>
-                            <button class="btn btn-danger" @click="removeYoutube(video)">Remove</button>
+                            <SyncOptions
+                                :syncMethod="video.syncMethod"
+                                :simpleSync="video.simpleSync"
+                                :advancedSync="video.advancedSync"
+                                @update:syncMethod="video.syncMethod = $event"
+                                @update:simpleSync="video.simpleSync = $event"
+                                @update:advancedSync="video.advancedSync = $event"
+                            />
+
+                            <div class="btn-group">
+                                <button class="btn btn-success" @click.prevent="saveYoutube(video)">Save</button>
+                                <button class="btn btn-outline-danger" type="button" @click="removeYoutube(video)">Remove</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="mb-5">
-                <h3 class="mb-5">Audio files</h3>
 
                 <div class="mb-5">
-                    <div v-for="audio in audioList" class="audio-item mb-3 pb-3" :key="audio.id">
-                        <div>
-                            <div class="mb-2">
-                                <audio :src="getAudioURL(tabID, audio.filename)" controls></audio>
-                            </div>
+                    <h2 class="mb-4 fs-3">Audio files</h2>
 
-                            <a :href="getAudioURL(tabID, audio.filename)" target="_blank">{{ audio.filename }}</a>
-                        </div>
-                        <div class="info">
-                            <SyncOptions
-                                :syncMethod="audio.syncMethod"
-                                :simpleSync="audio.simpleSync"
-                                :advancedSync="audio.advancedSync"
-                                @update:syncMethod="audio.syncMethod = $event"
-                                @update:simpleSync="audio.simpleSync = $event"
-                                @update:advancedSync="audio.advancedSync = $event"
-                            />
-                            <button class="btn btn-primary" @click.prevent="saveAudio(audio)">Save</button>
-                        </div>
-                        <div class="buttons">
-                            <div class="btn-group">
-                                <button class="btn btn-danger" @click="removeAudio(audio)">Remove</button>
+                    <div class="mb-5">
+                        <div v-for="audio in audioList" class="audio-item mb-3 pb-3" :key="audio.id">
+                            <div>
+                                <div class="mb-2">
+                                    <audio :src="getAudioURL(tabID, audio.filename)" :aria-label="`Audio preview: ${audio.filename}`" controls></audio>
+                                </div>
+
+                                <a :href="getAudioURL(tabID, audio.filename)" target="_blank" rel="noopener">{{ audio.filename }}</a>
+                            </div>
+                            <div class="info">
+                                <SyncOptions
+                                    :syncMethod="audio.syncMethod"
+                                    :simpleSync="audio.simpleSync"
+                                    :advancedSync="audio.advancedSync"
+                                    @update:syncMethod="audio.syncMethod = $event"
+                                    @update:simpleSync="audio.simpleSync = $event"
+                                    @update:advancedSync="audio.advancedSync = $event"
+                                />
+                                <button class="btn btn-success" @click.prevent="saveAudio(audio)">Save</button>
+                            </div>
+                            <div class="buttons">
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-danger" type="button" @click="removeAudio(audio)">Remove</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <Vue3Dropzone
-                    ref="audioDropzone"
-                    v-model="audioFiles"
-                    :maxFileSize="100"
-                    @error="dropzoneError"
-                >
-                    <template #placeholder-img>&nbsp;
+                    <Vue3Dropzone
+                        ref="audioDropzone"
+                        v-model="audioFiles"
+                        :maxFileSize="100"
+                        @error="dropzoneError"
+                    >
+                        <template #placeholder-img>&nbsp;
                     </template>
-                    <template #title>
+                        <template #title>
                         Drop your audio file here
                     </template>
-                    <template #description>
+                        <template #description>
                         Formats: mp3, ogg
                     </template>
-                </Vue3Dropzone>
+                    </Vue3Dropzone>
 
-                <button
-                    @click="uploadAudio"
-                    class="btn btn-primary w-100 mt-4"
-                    :disabled="isUploading"
-                >
+                    <button
+                        @click="uploadAudio"
+                        class="btn btn-primary w-100 mt-4"
+                        :disabled="isUploading"
+                    >
                     {{ isUploading ? "Uploading..." : "Upload" }}
                 </button>
+                </div>
             </div>
-        </div>
 
-        <!-- Tab File Page -->
-        <div v-else-if='this.page === "tab-file"' class="mb-5">
-            <h2 class="mt-4 mb-4">Method 1: Direct Edit</h2>
-            <p>
+            <!-- Tab File Page -->
+            <div v-else-if='this.page === "tab-file"' class="mb-5">
+                <h2 class="mt-4 mb-4 fs-3">Method 1: Direct Edit</h2>
+                <p>
                 If you can access the file system, you can edit/replace the tab directly, the path is:<br />
                 <strong v-if="showOpenButtons">{{ filePath }}</strong>
                 <a v-else :href="`${baseURL}/api/tab/${tabID}/file`" :download="tab.originalFilename">{{ filePath }}</a>
             </p>
 
-            <h2 class="mt-4 mb-4">Method 2: Upload and replace the tab file</h2>
+                <h2 class="mt-4 mb-4 fs-3">Method 2: Upload and replace the tab file</h2>
 
-            <Vue3Dropzone
-                v-model="tabFiles"
-                :maxFileSize="500"
-                @error="dropzoneError"
-            >
-                <template #title>
+                <Vue3Dropzone
+                    v-model="tabFiles"
+                    :maxFileSize="500"
+                    @error="dropzoneError"
+                >
+                    <template #title>
                     Drop your tab here
                 </template>
-                <template #description>Supports {{ supportedFormatCommaString }}</template>
-            </Vue3Dropzone>
+                    <template #description>Supports {{ supportedFormatCommaString }}</template>
+                </Vue3Dropzone>
 
-            <button
-                @click="uploadTab"
-                class="btn btn-primary w-100 mt-4"
-                :disabled="isUploading"
-            >
+                <button
+                    @click="uploadTab"
+                    class="btn btn-primary w-100 mt-4"
+                    :disabled="isUploading"
+                >
                 {{ isUploading ? "Uploading..." : "Upload" }}
             </button>
-        </div>
+            </div>
+        </template>
     </div>
 </template>
 
 <style scoped lang="scss">
 .menu {
     display: flex;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
 
-    a {
-        //text-decoration: underline;
+    .menu-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        // current section: filled + underline, so state is not colour only
+        &.router-link-exact-active,
+        &.active {
+            color: #fff;
+            background-color: var(--bs-primary);
+            border-color: var(--bs-primary);
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 0.25em;
+        }
+    }
+}
+
+.video-frame {
+    flex: 0 1 355px;
+    min-width: 0;
+    aspect-ratio: 16 / 9;
+
+    iframe {
+        width: 100%;
+        height: 100%;
     }
 }
 
 .youtube-item,
 .audio-item {
     display: flex;
+    flex-wrap: wrap;
     gap: 15px;
     align-items: flex-start;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--dt-divider);
     .info {
-        flex-grow: 1;
+        flex: 1 1 260px;
+        min-width: 0;
     }
     .buttons {
         align-self: center;
     }
+}
+
+.audio-item audio {
+    max-width: 100%;
 }
 
 .suggestion {
@@ -640,7 +697,7 @@ export default defineComponent({
     align-items: center;
     gap: 12px;
     padding: 8px 0;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--dt-divider);
     img {
         width: 120px;
         height: 68px;
@@ -648,6 +705,7 @@ export default defineComponent({
     }
     div {
         flex: 1;
+        min-width: 0;
     }
 }
 </style>

@@ -52,29 +52,31 @@ export default defineComponent({
 <template>
     <div>
         <div class="btn-group mb-3" role="group" aria-label="Sync method">
-            <button type="button" class="btn" :class="syncMethodInternal === 'simple' ? 'btn-primary' : 'btn-outline-secondary'" @click="syncMethodInternal = 'simple'">Simple Sync</button>
-            <button type="button" class="btn" :class="syncMethodInternal === 'advanced' ? 'btn-primary' : 'btn-outline-secondary'" @click="syncMethodInternal = 'advanced'">Advanced Sync</button>
+            <button type="button" class="btn sync-method-button" :class="syncMethodInternal === 'simple' ? 'btn-primary' : 'btn-outline-secondary'" :aria-pressed="syncMethodInternal === 'simple'"
+                @click="syncMethodInternal = 'simple'">Simple Sync</button>
+            <button type="button" class="btn sync-method-button" :class="syncMethodInternal === 'advanced' ? 'btn-primary' : 'btn-outline-secondary'" :aria-pressed="syncMethodInternal === 'advanced'"
+                @click="syncMethodInternal = 'advanced'">Advanced Sync</button>
         </div>
 
         <div v-if='syncMethodInternal === "simple"' class="mb-3">
-            1st Bar Start Point (start at {{ simpleSyncSecond }} second)
+            <label for="simple-sync-input">1st Bar Start Point (start at {{ simpleSyncSecond }} second)</label>
 
             <div class="my-2 text-info">
                 Perfect for songs with a consistent tempo and the tab have a correct bpm.
             </div>
 
-            <input type="number" class="form-control" step="0.1" v-model="simpleSyncSecond">
+            <input id="simple-sync-input" type="number" class="form-control" step="0.1" inputmode="decimal" v-model="simpleSyncSecond">
         </div>
 
         <div v-if='syncMethodInternal === "advanced"' class="mb-3">
-            Advanced Sync Points
+            <label for="advanced-sync-input">Advanced Sync Points</label>
 
             <div class="my-2 text-info">
                 <p>
                     You can use this to sync the song bar by bar.
                 </p>
                 <p>
-                    \sync {Bar} {Occurence} {Offset}
+                    <code>\sync {Bar} {Occurence} {Offset}</code>
                 </p>
                 <ul>
                     <li>Bar: 0 is the first bar</li>
@@ -84,16 +86,20 @@ export default defineComponent({
             </div>
 
             <textarea
+                id="advanced-sync-input"
                 class="form-control"
                 rows="10"
                 v-model="advancedSyncInternal"
                 :placeholder='"Example:\n" +
                 "\\sync 0 0 36\n" +
                 "\\sync 16 0 35425"'
-            >
-                            </textarea>
+            ></textarea>
         </div>
     </div>
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.sync-method-button {
+    min-height: 44px;
+}
+</style>

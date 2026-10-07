@@ -66,7 +66,7 @@ Download the [compose.yaml]() file and put it in an empty folder.
 ```yaml
 services:
     app:
-        image: emanuelet/drumtabs:1.9.0
+        image: emanuelet/drumtabs:1.9.1
         ports:
             # Host Port:Container Port
             - "47777:47777"
@@ -92,7 +92,8 @@ Run a local stdio MCP server for agents that need full control of this tab libra
 DATA_DIR=./data deno task mcp
 ```
 
-It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
+It provides tools to list, read, create, update, replace, and recoverably delete tabs, plus manage attached audio and YouTube sync records. It is a trusted local control surface: any connected MCP
+client can read and modify the complete library. The server accepts base64 file content, limits writes to 20 MiB, and requires explicit confirmation for destructive operations.
 
 Configure a local MCP client to start it from this repository:
 
@@ -117,7 +118,7 @@ Cloudflare deployment is optional and independent from the local Deno library. I
 ### Docker
 
 ```bash
-docker run -d --name drumtabs -p 47777:47777 -v drumtabs:/app/data --restart unless-stopped emanuelet/drumtabs:1.9.0
+docker run -d --name drumtabs -p 47777:47777 -v drumtabs:/app/data --restart unless-stopped emanuelet/drumtabs:1.9.1
 ```
 
 Go to `http://localhost:47777` to access the web UI.

@@ -74,9 +74,24 @@ export default defineComponent({
             youtubeSyncOffsetSeconds: 0,
 
             keyEvents: (e) => {
-                // Do not handle these tagName, because the only input is sync point, it is weird when play space to test the sync point
-                // It will type a space in the input instead of playing the music
-                // element.tagName === "INPUT" || element.tagName === "TEXTAREA" || element.isContentEditable
+                if (e.key === "Escape") {
+                    this.closeOverlays(true);
+                    return;
+                }
+
+                if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) {
+                    return;
+                }
+
+                // Never hijack keys from form controls, sliders or editable content (e.g. Space in a sync input).
+                const target = e.target instanceof Element ? e.target : null;
+                if (target?.closest('input, select, textarea, [role="slider"], [contenteditable=""], [contenteditable="true"]')) {
+                    return;
+                }
+                // Focused buttons/links keep their native Space/Enter activation; other shortcuts still work.
+                if (target?.closest("button, a[href]") && (e.code === "Space" || e.code === "Enter")) {
+                    return;
+                }
 
                 if (e.code === "Space") {
                     e.preventDefault();
@@ -107,6 +122,9 @@ export default defineComponent({
             showDrumNotation: false,
             showSecondaryControls: false,
             isYoutubeVideoMinimized: false,
+            toolbarRevealed: false,
+            loadState: "loading",
+            loadError: "",
         };
     },
     computed: {
@@ -132,13 +150,31 @@ export default defineComponent({
             return this.bpm.toFixed(2);
         },
 
+        isYoutubeAudio() {
+            return this.currentAudio.startsWith("youtube-");
+        },
+
+        audioIcon() {
+            if (this.currentAudio === "none") return "volume-xmark";
+            if (this.currentAudio === "backingTrack" || this.currentAudio.startsWith("audio-")) return "headphones";
+            return "volume-high";
+        },
+
         audioSelectionLabel() {
             if (this.currentAudio === "synth") return "Synth";
             if (this.currentAudio === "none") return "Mute";
             if (this.currentAudio === "backingTrack") return "Backing Track";
-            if (this.currentAudio.startsWith("youtube-")) return "Youtube";
+            if (this.currentAudio.startsWith("youtube-")) return "YouTube";
             if (this.currentAudio.startsWith("audio-")) return "Audio";
             return "Audio";
+        },
+
+        youtubeSyncActionLabel() {
+            return this.selectedYoutubeSyncBarIndex === null ? "Add" : "Update";
+        },
+
+        trackControlsUnavailable() {
+            return this.currentAudio.startsWith("youtube-");
         },
 
         youtubeSyncPoints() {
@@ -299,14 +335,6 @@ export default defineComponent({
                     }
                 }
             }
-
-            // Show the bar cursor if enabled
-            if (this.setting.cursor === "bar") {
-                const barCursor = document.querySelector(".at-cursor-bar");
-                if (barCursor) {
-                    barCursor.classList.add("enable");
-                }
-            }
         },
 
         enableCountIn() {
@@ -394,7 +422,20 @@ export default defineComponent({
                 this.pause();
             } else if (this.currentAudio.startsWith("youtube-")) {
                 const videoID = this.currentAudio.substring(8);
-                await this.initYoutube(videoID);
+                try {
+                    await this.initYoutube(videoID);
+                } catch (e) {
+                    console.error("YouTube load failed:", e);
+                    this.isInitializingAudio = false;
+                    this.destroyYoutubePlayer();
+                    notify({
+                        type: "error",
+                        title: "YouTube",
+                        text: "Could not load the YouTube video, falling back to synth.",
+                    });
+                    this.currentAudio = "synth";
+                    return;
+                }
             } else if (this.currentAudio.startsWith("audio-")) {
                 const filename = this.currentAudio.substring(6);
                 await this.initAudio(filename);
@@ -425,82 +466,44 @@ export default defineComponent({
     async mounted() {
         this.isLoggedIn = await isLoggedIn();
         this.setting = getSetting();
-        this.toolbarHidden = this.setting.toolbarAutoHide;
         this.tabID = this.$route.params.id;
         this.tabScale = this.getConfig("scale", this.setting.scale);
-        const urlParams = new URLSearchParams(window.location.search);
 
-        try {
-            const response = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" });
+        window.addEventListener("keydown", this.keyEvents);
+
+        // Close open lists/popovers when clicking outside
+        this._onDocumentClick = (e) => {
             try {
-                await checkFetch(response);
-            } catch (e) {
-                if (e.message === "Not logged in") {
-                    this.$router.push("/login");
-                    return;
+                const outside = (ref) => {
+                    const el = this.$refs[ref];
+                    return !el || !el.contains(e.target);
+                };
+
+                if (this.showTrackList && outside("trackSelector") && outside("trackList")) {
+                    this.showTrackList = false;
                 }
-                throw e;
-            }
-            const metadata = await response.json();
-            if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
-                this.isTextTab = true;
-                return;
-            }
-
-            // Override trackID if provided in URL
-            const trackParam = urlParams.get("track");
-            if (trackParam) {
-                const id = parseInt(trackParam);
-                if (!isNaN(id)) {
-                    this.setConfig("trackID", id);
+                if (this.showAudioList && outside("audioSelector") && outside("audioList")) {
+                    this.showAudioList = false;
                 }
-            }
-
-            // Override audio source if provided in URL
-            const audioParam = urlParams.get("audio");
-            if (audioParam) {
-                this.setConfig("audio", audioParam);
-            }
-
-            const trackID = this.getConfig("trackID", 0);
-
-            // Load the AlphaTab
-            await this.load(trackID, metadata);
-
-            window.addEventListener("keydown", this.keyEvents);
-
-            // Close open lists when clicking outside
-            this._onDocumentClick = (e) => {
-                try {
-                    // Track list
-                    if (this.showTrackList) {
-                        const sel = this.$refs.trackSelector;
-                        const list = this.$refs.trackList;
-                        if (!sel.contains(e.target) && !list.contains(e.target)) {
-                            this.showTrackList = false;
-                        }
-                    }
-
-                    // Audio list
-                    if (this.showAudioList) {
-                        const sel = this.$refs.audioSelector;
-                        const list = this.$refs.audioList;
-                        if (!sel.contains(e.target) && !list.contains(e.target)) {
-                            this.showAudioList = false;
-                        }
-                    }
-                } catch (err) {
-                    console.error(err);
+                if (this.showSpeedSelector && outside("speedSelector")) {
+                    this.showSpeedSelector = false;
                 }
-            };
-            window.addEventListener("click", this._onDocumentClick);
-        } catch (e) {
-            notify({
-                type: "error",
-                title: "Error",
-                text: e.message,
-            });
-        }
+                if (this.showDrumNotation && outside("drumNotation")) {
+                    this.showDrumNotation = false;
+                }
+                if (this.showSecondaryControls && outside("secondaryControls") && outside("secondaryToggle")) {
+                    this.showSecondaryControls = false;
+                }
+                if (this.toolbarRevealed && outside("toolbar")) {
+                    this.toolbarRevealed = false;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        window.addEventListener("click", this._onDocumentClick);
+
+        await this.initTab();
     },
     beforeUnmount() {
         console.log("Before unmount");
@@ -513,6 +516,91 @@ export default defineComponent({
         }
     },
     methods: {
+        async initTab() {
+            this.loadState = "loading";
+            this.loadError = "";
+            const urlParams = new URLSearchParams(window.location.search);
+
+            try {
+                const response = await fetch(baseURL + `/api/tab/${this.tabID}`, { credentials: "include" });
+                try {
+                    await checkFetch(response);
+                } catch (e) {
+                    if (e.message === "Not logged in") {
+                        this.$router.push("/login");
+                        return;
+                    }
+                    throw e;
+                }
+                const metadata = await response.json();
+                if (metadata.tab?.filename?.toLowerCase().endsWith(".txt")) {
+                    this.isTextTab = true;
+                    return;
+                }
+
+                // Override trackID if provided in URL
+                const trackParam = urlParams.get("track");
+                if (trackParam) {
+                    const id = parseInt(trackParam);
+                    if (!isNaN(id)) {
+                        this.setConfig("trackID", id);
+                    }
+                }
+
+                // Override audio source if provided in URL
+                const audioParam = urlParams.get("audio");
+                if (audioParam) {
+                    this.setConfig("audio", audioParam);
+                }
+
+                const trackID = this.getConfig("trackID", 0);
+
+                // Load the AlphaTab
+                await this.load(trackID, metadata);
+                this.loadState = "ready";
+            } catch (e) {
+                this.loadState = "error";
+                this.loadError = e?.message || "Unknown error";
+                notify({
+                    type: "error",
+                    title: "Error",
+                    text: this.loadError,
+                });
+            }
+        },
+
+        /**
+         * Close open popovers/lists. Returns true if something was open.
+         * @param {boolean} restoreFocus Move focus back to the trigger when focus was inside the closed element.
+         */
+        closeOverlays(restoreFocus = false) {
+            const items = [
+                ["showTrackList", ["trackList"], "trackSelector"],
+                ["showAudioList", ["audioList"], "audioSelector"],
+                ["showSpeedSelector", ["speedSelector"], "speedSelector"],
+                ["showDrumNotation", ["drumNotation"], "drumNotation"],
+                ["showSecondaryControls", ["secondaryControls"], "secondaryToggle"],
+                ["toolbarRevealed", [], null],
+            ];
+            let closed = false;
+            for (const [flag, containers, trigger] of items) {
+                if (!this[flag]) continue;
+                if (flag === "toolbarRevealed" && closed) continue;
+                const hadFocus = containers.some((ref) => this.$refs[ref]?.contains(document.activeElement));
+                this[flag] = false;
+                closed = true;
+                if (flag === "toolbarRevealed" && this.$refs.toolbar?.contains(document.activeElement)) {
+                    // Otherwise :focus-visible would keep the auto-hide toolbar open
+                    document.activeElement.blur();
+                }
+                if (restoreFocus && hadFocus && trigger) {
+                    const el = this.$refs[trigger];
+                    (el?.matches?.("button") ? el : el?.querySelector("button"))?.focus();
+                }
+            }
+            return closed;
+        },
+
         adjustBpm(amount) {
             this.setBpm(this.bpm + amount);
         },
@@ -581,18 +669,6 @@ export default defineComponent({
             trackID = await this.initContainer(tempToken, trackID);
 
             this.setConfig("trackID", trackID);
-        },
-
-        updatePlaybackHighlights() {
-            const score = this.$refs.bassTabContainer;
-            if (!score) return;
-
-            const beatCursor = score.querySelector(".at-cursor-beat");
-            beatCursor?.classList.toggle("invisible", this.setting.cursor === "invisible");
-
-            for (const barCursor of score.querySelectorAll(".at-cursor-bar")) {
-                barCursor.classList.add("enable");
-            }
         },
 
         countIn() {
@@ -744,6 +820,7 @@ export default defineComponent({
 
                 if (!(this.$refs.bassTabContainer instanceof HTMLElement)) {
                     reject(new Error("Container element not found"));
+                    return;
                 }
 
                 trackID = Number.isInteger(trackID) && trackID >= 0 ? trackID : 0;
@@ -813,6 +890,8 @@ export default defineComponent({
                         resources: displayResources,
                         layoutMode,
                         scale: this.tabScale,
+                        // [left-right, top-bottom]; alphaTab default is [35, 35]
+                        padding: [10, 35],
                     },
                 });
 
@@ -823,6 +902,12 @@ export default defineComponent({
                 // Web Audio click can become silent while playback continues.
                 this.api.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
                 this.api.midiEventsPlayed.on((args) => metronome.handleEvents(args.events));
+
+                // Surface load/render failures instead of waiting forever
+                this.api.error.on((error) => {
+                    console.error("alphaTab error:", error);
+                    reject(new Error(error?.message ? `Could not load the tab file: ${error.message}` : "Could not load the tab file."));
+                });
 
                 // Used for showing/hiding the "Restart" button
                 this.api.playbackRangeChanged.on(() => {
@@ -1242,92 +1327,6 @@ export default defineComponent({
             }, 1500);
         },
 
-        // Style the score with custom colors
-        applyColors(score) {
-            let stringColors = {
-                1: alphaTab.model.Color.fromJson("#bf3732"),
-                2: alphaTab.model.Color.fromJson("#fff800"),
-                3: alphaTab.model.Color.fromJson("#0080ff"),
-                4: alphaTab.model.Color.fromJson("#e07b39"),
-                5: alphaTab.model.Color.fromJson("#2A8E08"),
-                6: alphaTab.model.Color.fromJson("#A349A4"),
-            };
-
-            if (this.setting.scoreColor === "light") {
-                stringColors[2] = alphaTab.model.Color.fromJson("#b5a33a");
-            }
-
-            // traverse hierarchy and apply colors as desired
-            for (const track of score.tracks) {
-                for (const staff of track.staves) {
-                    console.log(this.setting.noteColor, staff.stringTuning.tunings.length);
-
-                    // Coloring 5string bass line for louis-bass-v
-                    if (this.setting.noteColor === "louis-bass-v" && staff.stringTuning.tunings.length === 5) {
-                        stringColors = {
-                            1: alphaTab.model.Color.fromJson("#b1da68"),
-                            2: alphaTab.model.Color.fromJson("#bf3732"),
-                            3: alphaTab.model.Color.fromJson("#fff800"),
-                            4: alphaTab.model.Color.fromJson("#0080ff"),
-                            5: alphaTab.model.Color.fromJson("#e07b39"),
-                        };
-                    }
-
-                    for (const bar of staff.bars) {
-                        for (const voice of bar.voices) {
-                            for (const beat of voice.beats) {
-                                // on tuplets colors beam and tuplet bracket
-                                if (beat.hasTuplet) {
-                                    beat.style = new alphaTab.model.BeatStyle();
-                                    const color = alphaTab.model.Color.fromJson("#00DD00");
-                                    beat.style.colors.set(
-                                        alphaTab.model.BeatSubElement.StandardNotationTuplet,
-                                        color,
-                                    );
-                                    beat.style.colors.set(
-                                        alphaTab.model.BeatSubElement.StandardNotationBeams,
-                                        color,
-                                    );
-                                }
-
-                                if (this.setting.noteColor !== "none") {
-                                    for (const note of beat.notes) {
-                                        note.style = new alphaTab.model.NoteStyle();
-                                        note.style.colors.set(alphaTab.model.NoteSubElement.GuitarTabFretNumber, stringColors[note.string]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-
-        /**
-         * Override hidden staves based on Style settings to fix Guitar Pro hidden tabs.
-         * ⚠️ This will break drum score
-         * - Style "tab": showTablature = true, showStandardNotation = false
-         * - Style "score": showTablature = false, showStandardNotation = true
-         * - Style "score-tab": both = true
-         */
-        overrideHiddenStaves(score) {
-            for (const track of score.tracks) {
-                for (const staff of track.staves) {
-                    // Override visibility flags based on user's Style setting
-                    if (this.setting.scoreStyle === "tab" || this.setting.scoreStyle === "horizontal-tab") {
-                        staff.showTablature = true;
-                        staff.showStandardNotation = false;
-                    } else if (this.setting.scoreStyle === "score") {
-                        staff.showTablature = false;
-                        staff.showStandardNotation = true;
-                    } else if (this.setting.scoreStyle === "score-tab") {
-                        staff.showTablature = true;
-                        staff.showStandardNotation = true;
-                    }
-                }
-            }
-        },
-
         async audioYoutube(videoID) {
             this.currentAudio = "youtube-" + videoID;
             this.closeAllList();
@@ -1350,6 +1349,9 @@ export default defineComponent({
 
             // Init the audio handler if not exists
             if (!this.audioHandler) {
+                const onPlayRejected = () => {
+                    this.playing = false;
+                };
                 this.audioHandler = {
                     get backingTrackDuration() {
                         const duration = audioPlayer.duration;
@@ -1371,7 +1373,10 @@ export default defineComponent({
                         audioPlayer.currentTime = time / 1000;
                     },
                     play() {
-                        audioPlayer.play();
+                        audioPlayer.play().catch((error) => {
+                            console.error("audio.play() rejected:", error);
+                            onPlayRejected();
+                        });
                     },
                     pause() {
                         audioPlayer.pause();
@@ -1419,12 +1424,24 @@ export default defineComponent({
                     // Else just pause
                     if (this.isLooping) {
                         audioPlayer.currentTime = 0;
-                        audioPlayer.play();
+                        audioPlayer.play().catch(() => {});
                     } else {
                         this.playing = false;
                         this.api.pause();
                         window.clearInterval(updateTimer);
                     }
+                });
+                audioPlayer.addEventListener("error", () => {
+                    // Ignore the empty-src error fired before any file is chosen
+                    if (!audioPlayer.getAttribute("src")) {
+                        return;
+                    }
+                    this.playing = false;
+                    notify({
+                        type: "error",
+                        title: "Audio",
+                        text: "Could not load the audio file.",
+                    });
                 });
                 audioPlayer.addEventListener("volumechange", () => {
                     this.api.masterVolume = audioPlayer.volume;
@@ -1592,6 +1609,7 @@ export default defineComponent({
             }
 
             const youtubePlayerReady = Promise.withResolvers();
+            let isPlayerReady = false;
             let initialSeek = -1;
             const applyInitialSeek = () => {
                 if (initialSeek < 0) {
@@ -1608,6 +1626,7 @@ export default defineComponent({
                 playerVars: { "autoplay": 0, "controls": 0 }, // Playback is controlled by the app.
                 events: {
                     "onReady": (e) => {
+                        isPlayerReady = true;
                         youtubePlayerReady.resolve();
                     },
 
@@ -1652,11 +1671,23 @@ export default defineComponent({
                     },
                     "onError": (e) => {
                         youtubePlayerReady.reject(e);
+                        if (isPlayerReady) {
+                            this.playing = false;
+                            notify({
+                                type: "error",
+                                title: "YouTube",
+                                text: "This video could not be played.",
+                            });
+                        }
                     },
                 },
             });
 
-            await youtubePlayerReady.promise;
+            try {
+                await youtubePlayerReady.promise;
+            } finally {
+                clearTimeout(ytWarning);
+            }
             console.log("YouTube Player ready");
 
             const alphaTabYoutubeHandler = {
@@ -1699,7 +1730,6 @@ export default defineComponent({
             this.youtubePlayer = player;
             this.alphaTabYoutubeHandler = alphaTabYoutubeHandler;
             this.youtubePlayer.setVolume(Math.min(100, this.masterVolume));
-            clearTimeout(ytWarning);
         },
 
         stopYoutubeSync() {
@@ -1716,16 +1746,9 @@ export default defineComponent({
             this.alphaTabYoutubeHandler = null;
         },
 
-        getStaveProfile() {
-            if (this.setting.scoreStyle === "tab" || this.setting.scoreStyle === "horizontal-tab") {
-                return StaveProfile.Tab;
-            } else if (this.setting.scoreStyle === "score") {
-                return StaveProfile.Score;
-            } else if (this.setting.scoreStyle === "score-tab") {
-                return StaveProfile.ScoreTab;
-            } else {
-                return StaveProfile.Default;
-            }
+        audioNone() {
+            this.currentAudio = "none";
+            this.closeAllList();
         },
 
         async audioSynth() {
@@ -1850,6 +1873,19 @@ export default defineComponent({
                 return fallback;
             }
             return Math.min(this.allowVolumeBoost ? 200 : 100, Math.max(0, parsedVolume));
+        },
+
+        /**
+         * With boost enabled, 100% sits in the middle of a ~120px slider (about 1.7 units per pixel),
+         * so releasing the thumb "on" it often lands on 98-99%. Snap to 100% when released close to it.
+         * Pointer-only, so keyboard steps (+/-1) still work.
+         */
+        snapToFull(input, apply) {
+            const value = Number(input.value);
+            if (this.allowVolumeBoost && value !== 100 && Math.abs(value - 100) <= 3) {
+                input.value = 100;
+                apply(100);
+            }
         },
 
         setAllowVolumeBoost(allowVolumeBoost) {
@@ -2032,18 +2068,26 @@ export default defineComponent({
 
 <template>
     <TextTabPlayer v-if="isTextTab" :id="String(tabID)" />
-    <div v-else class="main" :class='{ "light": this.setting.scoreColor === "light" }'>
+    <div v-else class="main" :class='{ "light": setting.scoreColor === "light" }' :aria-busy="loadState === 'loading'">
         <h1>{{ tab.title }}</h1>
         <div class="artist-row">
+            <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature" title="Key signature">
+                {{ keySignature }}
+            </div>
             <h2>{{ tab.artist }}</h2>
-            <div class="drum-notation-selector" v-if="isDrum()">
+            <div class="drum-notation-selector" v-if="loadState === 'ready' && isDrum()" ref="drumNotation">
                 <button class="btn btn-outline-secondary" type="button" aria-label="Drum notation" title="Drum notation" @click="showDrumNotation = !showDrumNotation"
-                    :aria-expanded="showDrumNotation">
+                    aria-controls="drum-notation-tooltip" :aria-expanded="showDrumNotation">
                     <font-awesome-icon :icon='["fas", "drum"]' />
                     <span class="drum-notation-label">Notation</span>
                 </button>
-                <div class="drum-notation-tooltip" v-if="showDrumNotation">
-                    <strong class="drum-notation-title">DRUMSET</strong>
+                <div id="drum-notation-tooltip" class="drum-notation-tooltip" v-if="showDrumNotation" role="group" aria-label="Drum notation key">
+                    <div class="drum-notation-heading">
+                        <strong class="drum-notation-title">DRUMSET</strong>
+                        <button class="notation-close" type="button" aria-label="Close drum notation key" @click="showDrumNotation = false">
+                            <font-awesome-icon :icon='["fas", "xmark"]' />
+                        </button>
+                    </div>
                     <div class="drum-notation-groups">
                         <div
                             class="drum-notation-group bass"><span>Bass drum</span><small>Normal</small><svg viewBox="0 0 28 60"><path class="drum-note" d="M20 38c1 2-1 4-4 5s-6 1-7-1c-1-2 1-4 4-5s6-1 7 1Z" /></svg></div>
@@ -2061,8 +2105,18 @@ export default defineComponent({
                 </div>
             </div>
         </div>
-        <div class="key-signature badge bg-secondary" v-if="keySignature && setting.showKeySignature">
-            {{ keySignature }}
+        <div v-if="loadState === 'loading'" class="load-state" role="status">
+            <span class="load-spinner" aria-hidden="true"></span>
+            <span>Loading tab...</span>
+            <div class="load-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+        </div>
+        <div v-else-if="loadState === 'error'" class="load-state error" role="alert">
+            <strong>Could not load this tab.</strong>
+            <span class="load-detail">{{ loadError }}</span>
+            <button class="btn btn-primary" type="button" @click="initTab">
+                <font-awesome-icon :icon='["fas", "rotate-left"]' />
+                Retry
+            </button>
         </div>
         <div class="score-container">
             <div ref="bassTabContainer" v-pre></div>
@@ -2075,26 +2129,13 @@ export default defineComponent({
         <!-- Just add a margin, don't let youtube player overlay the tab -->
         <div :class='{ "yt-margin": currentAudio.startsWith(`youtube-`) }'></div>
 
-        <div class="toolbar" :class='{ "auto-hide": setting.toolbarAutoHide }'>
+        <div class="toolbar" ref="toolbar" :class='{ "auto-hide": setting.toolbarAutoHide, revealed: toolbarRevealed }'>
+            <button class="toolbar-handle" type="button" v-if="setting.toolbarAutoHide" :aria-expanded="toolbarRevealed" aria-label="Toolbar" title="Show or hide toolbar"
+                @click="toolbarRevealed = !toolbarRevealed">
+                <font-awesome-icon :icon='["fas", "caret-down"]' class="toolbar-handle-icon" :class="{ flipped: !toolbarRevealed }" />
+            </button>
             <div class="scroll">
-                <div class="track-selector selector" ref="trackSelector">
-                    <button class="button" type="button" @click='showList("track")' :aria-expanded="showTrackList">
-                        <font-awesome-icon :icon='["fas", "music"]' />
-                        <span v-if="tracks.length > 0">Tracks: {{ tracks[selectedTrack].name }}</span>
-                        <span v-else>Loading...</span>
-                        <font-awesome-icon :icon='["fas", "caret-down"]' />
-                    </button>
-                </div>
-
-                <div class="audio-selector selector" ref="audioSelector">
-                    <button class="button" type="button" @click='showList("audio")' :aria-expanded="showAudioList">
-                        <font-awesome-icon :icon='["fas", "volume-high"]' />
-                        {{ audioSelectionLabel }}
-                        <font-awesome-icon :icon='["fas", "caret-down"]' />
-                    </button>
-                </div>
-
-                <button class="btn btn-primary" @click="playPause" :class="{ active: playing }">
+                <button class="btn" type="button" @click="playPause" :class="playing ? 'btn-success active' : 'btn-primary'" :disabled="!ready">
                     <span v-if="!playing">
                         <font-awesome-icon :icon='["fas", "play"]' />
                         Play
@@ -2105,34 +2146,58 @@ export default defineComponent({
                     </span>
                 </button>
 
-                <div class="secondary-controls" :class="{ open: showSecondaryControls }">
-                    <button class="btn btn-warning" @click="playFromHighlightedRange()" v-if="playbackRange">
-                    <font-awesome-icon :icon='["fas", "play"]' />
-                    Restart
+                <button class="btn btn-warning restart-button" type="button" v-if="playbackRange" title="Restart from the selection" aria-label="Restart from the selection"
+                    @click="playFromHighlightedRange()">
+                    <font-awesome-icon :icon='["fas", "backward-step"]' />
+                    <span class="label">Restart</span>
                 </button>
 
-                    <button class="btn btn-secondary" @click="loop()" :class="{ active: isLooping }">
+                <div class="track-selector selector" ref="trackSelector">
+                    <button class="button" type="button" @click='showList("track")' aria-controls="track-list" :aria-expanded="showTrackList"
+                        :title="tracks.length > 0 ? `Tracks: ${tracks[selectedTrack]?.name}` : 'Tracks'">
+                        <font-awesome-icon :icon='["fas", "music"]' />
+                        <span class="label" v-if="tracks.length > 0">Tracks: {{ tracks[selectedTrack]?.name }}</span>
+                        <span class="label" v-else>Loading...</span>
+                        <font-awesome-icon class="caret" :icon='["fas", "caret-down"]' />
+                    </button>
+                </div>
+
+                <div class="audio-selector selector" ref="audioSelector">
+                    <button class="button" type="button" @click='showList("audio")' aria-controls="audio-list" :aria-expanded="showAudioList" :title="audioSelectionLabel">
+                        <font-awesome-icon v-if="isYoutubeAudio" :icon='["fab", "youtube"]' />
+                        <font-awesome-icon v-else :icon='["fas", audioIcon]' />
+                        <span class="label">{{ audioSelectionLabel }}</span>
+                        <font-awesome-icon class="caret" :icon='["fas", "caret-down"]' />
+                    </button>
+                </div>
+
+                <div id="secondary-controls" class="secondary-controls" ref="secondaryControls" :class="{ open: showSecondaryControls }">
+                    <div class="extra-controls">
+                        <button class="btn btn-secondary" type="button" @click="loop()" :class="{ active: isLooping }" :aria-pressed="isLooping">
                     <font-awesome-icon :icon='["fas", "check"]' v-if="isLooping" />
                     <font-awesome-icon :icon='["fas", "repeat"]' v-else />
                     Loop
                 </button>
-                    <button class="btn btn-secondary" @click="countIn()" :class='{ active: enableCountIn }'>
+                        <button class="btn btn-secondary" type="button" @click="countIn()" :class='{ active: enableCountIn }' :aria-pressed="enableCountIn">
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableCountIn" />
                     <font-awesome-icon :icon='["fas", "list-ol"]' v-else />
                     Count in
                 </button>
-                    <button class="btn btn-secondary" @click="metronome()" :class='{ active: enableMetronome, disabled: currentAudio !== "synth" }'>
+                        <button class="btn btn-secondary" type="button" @click="metronome()" :class='{ active: enableMetronome }' :aria-pressed="enableMetronome" :disabled='currentAudio !== "synth"'
+                            :title='currentAudio !== "synth" ? "Metronome is only available with the Synth audio source" : undefined'>
                     <font-awesome-icon :icon='["fas", "check"]' v-if="enableMetronome" />
                     <font-awesome-icon :icon='["fas", "stopwatch"]' v-else />
                     Metronome
                 </button>
+                    </div>
 
-                    <div class="speed-selector">
-                        <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" :aria-expanded="showSpeedSelector">
-                        <font-awesome-icon :icon='["fas", "gauge-high"]' />
-                        Speed: {{ formattedBpm }} BPM
-                    </button>
-                        <div class="speed-selector-popover" v-if="showSpeedSelector">
+                    <div class="speed-selector" ref="speedSelector">
+                        <button class="btn btn-secondary" type="button" @click="showSpeedSelector = !showSpeedSelector" aria-controls="speed-popover" :aria-expanded="showSpeedSelector"
+                            :title="`Speed: ${formattedBpm} BPM`">
+                            <font-awesome-icon :icon='["fas", "gauge-high"]' />
+                            <span class="label"><span class="prefix">Speed: </span>{{ formattedBpm }} BPM</span>
+                        </button>
+                        <div id="speed-popover" class="speed-selector-popover" v-if="showSpeedSelector" role="group" aria-label="Playback speed">
                             <div class="speed-selector-header">
                                 <div class="speed-selector-bpm">
                                     <button type="button" aria-label="Decrease tempo" @click="adjustBpm(-1)">−</button>
@@ -2152,7 +2217,7 @@ export default defineComponent({
                                 <div class="speed-ticks" aria-hidden="true">
                                     <i v-for="tick in 37" :key="tick" :class="{ major: (tick - 1) % 5 === 0 }"></i>
                                 </div>
-                                <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" />
+                                <input v-model.number="speed" type="range" min="20" max="200" step="5" aria-label="Playback speed" :aria-valuetext="`${speed}% (${formattedBpm} BPM)`" />
                                 <span class="speed-unit">%</span>
                             </div>
                         </div>
@@ -2162,32 +2227,39 @@ export default defineComponent({
                         <button class="btn btn-secondary" type="button" aria-label="Zoom out" :disabled="tabScale <= 0.5" @click="adjustTabScale(-0.1)">
                             <font-awesome-icon :icon='["fas", "magnifying-glass-minus"]' />
                         </button>
-                        <span>Zoom {{ Math.round(tabScale * 100) }}%</span>
+                        <span class="zoom-value"><span class="prefix">Zoom </span>{{ Math.round(tabScale * 100) }}%</span>
                         <button class="btn btn-secondary" type="button" aria-label="Zoom in" :disabled="tabScale >= 3" @click="adjustTabScale(0.1)">
                             <font-awesome-icon :icon='["fas", "magnifying-glass-plus"]' />
                         </button>
                     </div>
-
-                    <div class="btn-edit" v-if="isLoggedIn">
-                        <button class="btn btn-secondary" @click="edit()">
-                        <font-awesome-icon :icon='["fas", "pen"]' />
-                        Edit
-                    </button>
-                    </div>
                 </div>
 
-                <button class="btn btn-secondary secondary-controls-toggle" type="button" :aria-expanded="showSecondaryControls" @click="showSecondaryControls = !showSecondaryControls">
+                <div class="btn-edit" v-if="isLoggedIn">
+                    <button class="btn btn-info" type="button" title="Edit tab" @click="edit()">
+                        <font-awesome-icon :icon='["fas", "pen"]' />
+                        <span class="label">Edit</span>
+                    </button>
+                </div>
+
+                <button class="btn btn-secondary secondary-controls-toggle" type="button" ref="secondaryToggle" aria-controls="secondary-controls" :aria-expanded="showSecondaryControls"
+                    aria-label="More controls" title="More controls"
+                    @click="showSecondaryControls = !showSecondaryControls">
                     <font-awesome-icon :icon='["fas", "ellipsis"]' />
-                    More
                 </button>
             </div>
 
-            <div class="track-list list" v-if="showTrackList" ref="trackList">
-                <div class="p-2 text-end list-header">
-                    <font-awesome-icon :icon='["fas", "xmark"]' class="me-2 close" @click="showTrackList = false" />
+            <div id="track-list" class="track-list list" v-if="showTrackList" ref="trackList" role="group" aria-label="Tracks and volume">
+                <div class="list-header">
+                    <h2 class="list-title">Tracks &amp; volume</h2>
+                    <button class="list-close" type="button" aria-label="Close" @click="showTrackList = false">
+                        <font-awesome-icon :icon='["fas", "xmark"]' />
+                    </button>
                 </div>
                 <label class="volume-boost-toggle">
-                    <span>Allow volume boost</span>
+                    <span class="boost-text">
+                        <strong>Allow volume boost</strong>
+                        <small>Raise the volume up to 200%</small>
+                    </span>
                     <span class="volume-boost-switch">
                         <input type="checkbox" :checked="allowVolumeBoost" @change="setAllowVolumeBoost($event.target.checked)" />
                         <span aria-hidden="true"></span>
@@ -2196,82 +2268,109 @@ export default defineComponent({
                 <div class="volume-column-header">Volume</div>
 
                 <div class="master-volume item">
-                    <div class="name">Master</div>
+                    <div class="name">
+                        <font-awesome-icon :icon='["fas", "volume-high"]' class="row-icon" />
+                        Master
+                    </div>
                     <div class="list-button select-percentage">
-                        <input :class="{ 'boost-enabled': allowVolumeBoost }" type="range" min="0" :max="allowVolumeBoost ? 200 : 100" step="1" :value="masterVolume"
-                            @input="setMasterVolume($event.target.value)" />
+                        <input :class="{ 'boost-enabled': allowVolumeBoost }" :style="{ '--fill': `${masterVolume / (allowVolumeBoost ? 2 : 1)}%` }" type="range" min="0"
+                            :max="allowVolumeBoost ? 200 : 100" step="1" :value="masterVolume"
+                            aria-label="Master volume" :aria-valuetext="`${masterVolume}%`" @input="setMasterVolume($event.target.value)" @pointerup="snapToFull($event.target, setMasterVolume)" />
                         <output>{{ masterVolume }}%</output>
                     </div>
                 </div>
 
                 <div class="track item" v-for="track in tracks" :key="track.id" :class="{ active: selectedTrack === track.id }">
-                    <div class="name" @click="changeTrack(track.id)">{{ track.name }}</div>
-                    <button class="list-button solo" type="button" @click="toggleSolo(track.id)" :class="{ active: soloTrackID === track.id }" :disabled='currentAudio.startsWith("youtube-")'>
+                    <button class="name" type="button" :aria-current="selectedTrack === track.id ? 'true' : undefined" @click="changeTrack(track.id)">{{ track.name }}</button>
+                    <button class="list-button solo" type="button" @click="toggleSolo(track.id)" :class="{ active: soloTrackID === track.id }" :aria-pressed="soloTrackID === track.id"
+                        :disabled="trackControlsUnavailable" :title="trackControlsUnavailable ? 'Not available with YouTube audio' : undefined">
                         <font-awesome-icon :icon='["fas", "headphones"]' />
                         Solo
                     </button>
-                    <button class="list-button mute" type="button" @click="toggleMute(track.id)" :class="{ active: muteTrackList[track.id] }" :disabled='currentAudio.startsWith("youtube-")'>
+                    <button class="list-button mute" type="button" @click="toggleMute(track.id)" :class="{ active: muteTrackList[track.id] }" :aria-pressed="!!muteTrackList[track.id]"
+                        :disabled="trackControlsUnavailable" :title="trackControlsUnavailable ? 'Not available with YouTube audio' : undefined">
                         <font-awesome-icon :icon='["fas", "volume-xmark"]' />
                         Mute
                     </button>
-                    <div class="list-button select-percentage" :class="{ disabled: currentAudio.startsWith('youtube-') || muteTrackList[track.id] }">
-                        <input :class="{ 'boost-enabled': allowVolumeBoost }" type="range" min="0" :max="allowVolumeBoost ? 200 : 100" step="1" :value="trackVolumeList[track.id] ?? masterVolume"
-                            @input="setTrackVolume(track.id, $event.target.value)" :disabled='currentAudio.startsWith("youtube-") || muteTrackList[track.id]' />
+                    <div class="list-button select-percentage" :class="{ disabled: trackControlsUnavailable || muteTrackList[track.id] }">
+                        <input :class="{ 'boost-enabled': allowVolumeBoost }" :style="{ '--fill': `${(trackVolumeList[track.id] ?? masterVolume) / (allowVolumeBoost ? 2 : 1)}%` }" type="range" min="0"
+                            :max="allowVolumeBoost ? 200 : 100" step="1" :value="trackVolumeList[track.id] ?? masterVolume"
+                            :aria-label="`Volume for ${track.name}`" :aria-valuetext="`${trackVolumeList[track.id] ?? masterVolume}%`"
+                            @input="setTrackVolume(track.id, $event.target.value)" @pointerup="snapToFull($event.target, (value) => setTrackVolume(track.id, value))"
+                            :disabled="trackControlsUnavailable || muteTrackList[track.id]" />
                         <output>{{ trackVolumeList[track.id] ?? masterVolume }}%</output>
                     </div>
                 </div>
             </div>
 
-            <div class="audio-list list" v-if="showAudioList" ref="audioList">
-                <div class="p-2 text-end list-header">
-                    <font-awesome-icon :icon='["fas", "xmark"]' class="me-2 close" @click="showAudioList = false" />
+            <div id="audio-list" class="audio-list list" v-if="showAudioList" ref="audioList" role="group" aria-label="Audio source">
+                <div class="list-header">
+                    <h2 class="list-title">Audio source</h2>
+                    <button class="list-close" type="button" aria-label="Close" @click="showAudioList = false">
+                        <font-awesome-icon :icon='["fas", "xmark"]' />
+                    </button>
                 </div>
 
-                <div class="audio item" @click="audioSynth" :class='{ active: currentAudio === "synth" }'>
-                    <div class="name">
-                        <font-awesome-icon :icon='["fas", "music"]' class="me-2" />
-                        Synth
-                    </div>
-                </div>
+                <button class="audio item" type="button" @click="audioSynth" :class='{ active: currentAudio === "synth" }' :aria-current='currentAudio === "synth" ? "true" : undefined'>
+                    <span class="name">
+                        <font-awesome-icon :icon='["fas", "music"]' class="row-icon" />
+                        <span class="row-label">Synth</span>
+                        <font-awesome-icon :icon='["fas", "check"]' class="active-check" aria-hidden="true" />
+                    </span>
+                </button>
 
-                <div class="audio item" @click="audioBackingTrack" :class='{ active: currentAudio === "backingTrack" }' v-if="enableBackingTrack">
-                    <div class="name">Embedded Backing Track</div>
-                </div>
+                <button class="audio item" type="button" @click="audioBackingTrack" :class='{ active: currentAudio === "backingTrack" }'
+                    :aria-current='currentAudio === "backingTrack" ? "true" : undefined'
+                    v-if="enableBackingTrack">
+                    <span class="name">
+                        <font-awesome-icon :icon='["fas", "headphones"]' class="row-icon" />
+                        <span class="row-label">Embedded Backing Track</span>
+                        <font-awesome-icon :icon='["fas", "check"]' class="active-check" aria-hidden="true" />
+                    </span>
+                </button>
 
-                <div class="audio item" @click="audioYoutube(youtube.videoID)" v-for="youtube in youtubeList" :key="youtube.id" :class='{ active: currentAudio === "youtube-" + youtube.videoID }'>
-                    <div class="name">
-                        <font-awesome-icon :icon='["fas", "play"]' class="me-2" />
-                        Youtube: {{ youtube.videoID }}
-                    </div>
-                </div>
+                <button class="audio item" type="button" @click="audioYoutube(youtube.videoID)" v-for="youtube in youtubeList" :key="youtube.id"
+                    :class='{ active: currentAudio === "youtube-" + youtube.videoID }'
+                    :aria-current='currentAudio === "youtube-" + youtube.videoID ? "true" : undefined'>
+                    <span class="name">
+                        <font-awesome-icon :icon='["fab", "youtube"]' class="row-icon youtube" />
+                        <span class="row-label">YouTube: {{ youtube.videoID }}</span>
+                        <font-awesome-icon :icon='["fas", "check"]' class="active-check" aria-hidden="true" />
+                    </span>
+                </button>
 
-                <div class="audio item" @click="audioFile(audio.filename)" v-for="audio in audioList" :key="audio.filename" :class='{ active: currentAudio === "audio-" + audio.filename }'>
-                    <div class="name">
-                        <font-awesome-icon :icon='["fas", "file"]' class="me-2" />
-                        {{ audio.filename }}
-                    </div>
-                </div>
+                <button class="audio item" type="button" @click="audioFile(audio.filename)" v-for="audio in audioList" :key="audio.filename"
+                    :class='{ active: currentAudio === "audio-" + audio.filename }'
+                    :aria-current='currentAudio === "audio-" + audio.filename ? "true" : undefined'>
+                    <span class="name">
+                        <font-awesome-icon :icon='["fas", "file"]' class="row-icon" />
+                        <span class="row-label">{{ audio.filename }}</span>
+                        <font-awesome-icon :icon='["fas", "check"]' class="active-check" aria-hidden="true" />
+                    </span>
+                </button>
 
                 <!-- No Audio -->
-                <div
-                    class="audio item"
-                    @click='currentAudio = "none";
-                    closeAllList()'
-                    :class='{ active: currentAudio === "none" }'
-                >
-                    <div class="name">No Audio (Mute)</div>
-                </div>
+                <button class="audio item" type="button" @click="audioNone" :class='{ active: currentAudio === "none" }' :aria-current='currentAudio === "none" ? "true" : undefined'>
+                    <span class="name">
+                        <font-awesome-icon :icon='["fas", "volume-xmark"]' class="row-icon" />
+                        <span class="row-label">No Audio (Mute)</span>
+                        <font-awesome-icon :icon='["fas", "check"]' class="active-check" aria-hidden="true" />
+                    </span>
+                </button>
 
-                <div class="ms-4 me-4 mt-3 mb-3" v-if="isLoggedIn">
-                    <router-link :to="`/tab/${tab.id}/edit/audio`">Add Youtube or Audio File...</router-link>
-                </div>
+                <router-link v-if="isLoggedIn" class="list-add" :to="`/tab/${tab.id}/edit/audio`">
+                    <font-awesome-icon :icon='["fas", "plus"]' class="row-icon" />
+                    Add YouTube or Audio File…
+                </router-link>
             </div>
 
             <!-- USE v-show, because youtube player is not vue  -->
             <div v-show='currentAudio.startsWith("youtube-") || currentAudio.startsWith("audio-")' class="player-container">
                 <!-- Simple sync edit -->
                 <div class="sync-offset ps-3 pe-3 p-2" v-if='syncMethod === "simple" && isLoggedIn'>
-                    Sync Offset: <input type="number" class="form-control" min="-100000" max="100000" step="0.1" v-model="simpleSyncSecond" /> s
+                    <label for="sync-offset-input">Sync Offset:</label>
+                    <input id="sync-offset-input" type="number" class="form-control" min="-100000" max="100000" step="0.1" inputmode="decimal" v-model="simpleSyncSecond" />
+                    <span aria-hidden="true">s</span>
                 </div>
 
                 <!-- Youtube Player -->
@@ -2293,16 +2392,12 @@ export default defineComponent({
                                 Offset (s)
                                 <input v-model.number="youtubeSyncOffsetSeconds" type="number" min="0" step="0.001" />
                             </label>
-                            <button class="btn btn-primary" type="button" @click="addYoutubeSyncPoint" v-if="selectedYoutubeSyncBarIndex === null">
-                                <font-awesome-icon :icon='["fas", "plus"]' />
-                                Add
+                            <button class="btn btn-primary" type="button" @click="addYoutubeSyncPoint">
+                                <font-awesome-icon :icon='["fas", selectedYoutubeSyncBarIndex === null ? "plus" : "pen"]' />
+                                {{ youtubeSyncActionLabel }}
                             </button>
-                            <button class="btn btn-primary" type="button" @click="addYoutubeSyncPoint" v-else>
-                                <font-awesome-icon :icon='["fas", "pen"]' />
-                                Edit
-                            </button>
-                            <button class="btn btn-outline-primary" type="button" @click="captureYoutubeSyncPoint">
-                                Capture &amp; {{ selectedYoutubeSyncBarIndex === null ? "Add" : "Update" }}
+                            <button class="btn btn-outline-primary" type="button" @click="captureYoutubeSyncPoint" title="Use the current video time as the offset">
+                                Capture &amp; {{ youtubeSyncActionLabel }}
                             </button>
                             <button class="btn btn-danger" type="button" @click="deleteYoutubeSyncPoint" v-if="selectedYoutubeSyncBarIndex !== null">
                                 <font-awesome-icon :icon='["fas", "trash-can"]' />
@@ -2341,7 +2436,7 @@ export default defineComponent({
                 </div>
 
                 <!-- Audio Player -->
-                <audio ref="audioPlayer" class="player" controls v-show='currentAudio.startsWith("audio-")' hidden></audio>
+                <audio ref="audioPlayer" class="player" hidden></audio>
             </div>
         </div>
     </div>
@@ -2353,21 +2448,86 @@ export default defineComponent({
 
 $toolbar-height: 60px;
 $youtube-height: 200px;
+$handle-height: 24px;
+$touch-target: 44px;
+$padding: 20px;
+$volume-column-width: 207px; // select-percentage cell: 2 * padding + slider + gap + output + border
 
-// Light Score
+// Palette (kept local to this page)
+$color: #32393e; // panels, lists and chips
+$ink: #d6d6d6;
+$ink-strong: #fff;
+$toolbar-border: #3c3b40;
+$panel-dark: #212529;
+$field-border: #555b60;
+$chip-hover: #41494f;
+$popover-bg: #262d35;
+$popover-ink: #d9e0e8;
+$popover-bg-light: #fff;
+$popover-ink-light: #465467;
+$notation-ink-dark: #d8d8dc;
+$notation-line-dark: #7d7d86;
+$notation-ink-light: #465467;
+$notation-line-light: #8b95a1;
+$warning: #f8d84d;
+$marker-selected: #ff9f1a;
+$accent-dark: #65d52f;
+$accent-light: #1b7a24;
+$tick-dark: #aab4bf;
+$tick-light: #5d6978;
+$slider-track: #5f6b78;
+$slider-boost: #f0c674;
+$slider-boost-high: #a64040;
+$thumb: #f1f4f7;
+$thumb-ring: #344253;
+$focus-ring-dark: #f1f4f7;
+$focus-ring-light: #1b4fd1;
+$active-bar: #7aa2ff;
+$error-dark: #ffb4a8;
+$error-light: #b3261e;
+$title-light: #333;
+$page-light: #f1f1f1;
+
+@mixin focus-ring($offset: 2px) {
+    &:focus-visible {
+        outline: 2px solid var(--focus-ring, #{$focus-ring-dark});
+        outline-offset: $offset;
+    }
+}
+
+@mixin button-reset {
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+}
 
 .main {
+    --notation-ink: #{$notation-ink-dark};
+    --notation-line: #{$notation-line-dark};
+    --accent: #{$accent-dark};
+    --tick: #{$tick-dark};
+
     width: 95%;
-    color: #d6d6d6;
+    color: $ink;
     margin: 0 auto $toolbar-height auto;
 
     &.light {
-        background-color: #f1f1f1;
+        --notation-ink: #{$notation-ink-light};
+        --notation-line: #{$notation-line-light};
+        --accent: #{$accent-light};
+        --tick: #{$tick-light};
+
+        background-color: $page-light;
         padding-top: 30px;
 
         h1,
         h2 {
-            color: #333;
+            color: $title-light;
         }
     }
 }
@@ -2377,9 +2537,93 @@ $youtube-height: 200px;
     height: $youtube-height !important;
 }
 
+// Loading / error state
+
+.load-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 16px;
+    text-align: center;
+
+    &.error {
+        color: $error-dark;
+    }
+
+    .load-detail {
+        max-width: 60ch;
+        overflow-wrap: anywhere;
+        opacity: 0.85;
+    }
+}
+
+.main.light .load-state {
+    color: $title-light;
+
+    &.error {
+        color: $error-light;
+    }
+}
+
+.load-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: tab-spin 0.8s linear infinite;
+}
+
+.load-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(640px, 100%);
+    margin-top: 12px;
+
+    i {
+        display: block;
+        height: 14px;
+        background: currentColor;
+        border-radius: 4px;
+        opacity: 0.15;
+        animation: tab-pulse 1.4s ease-in-out infinite;
+
+        &:nth-child(2) {
+            width: 80%;
+        }
+
+        &:nth-child(3) {
+            width: 60%;
+        }
+    }
+}
+
+@keyframes tab-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes tab-pulse {
+    50% {
+        opacity: 0.3;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .load-spinner,
+    .load-skeleton i {
+        animation: none;
+    }
+}
+
+// Toolbar
+
 .toolbar {
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid #3c3b40;
+    border-bottom: 1px solid $toolbar-border;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -2390,12 +2634,78 @@ $youtube-height: 200px;
         background-color: rgba(33, 37, 41, 0.8);
     }
 
+    .toolbar-handle {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 72px;
+        height: $handle-height;
+        padding: 0;
+        color: $ink-strong;
+        cursor: pointer;
+        background: rgba($panel-dark, 0.92);
+        border: 1px solid $toolbar-border;
+        border-bottom: 0;
+        border-radius: 8px 8px 0 0;
+        transform: translateX(-50%);
+
+        .toolbar-handle-icon.flipped {
+            transform: rotate(180deg);
+        }
+
+        // Larger invisible touch area
+        &::before {
+            position: absolute;
+            inset: (-$touch-target + $handle-height) -12px 0;
+            content: "";
+        }
+
+        @include focus-ring(-4px);
+    }
+
+    // Auto-hide: only the handle stays visible. Hidden controls are visibility:hidden so
+    // they cannot be focused or clicked; the toolbar reveals on hover, keyboard focus on
+    // the handle/controls, or by tapping the handle.
     &.auto-hide {
         transition: transform 0.3s;
-        transform: translateY(calc(100% - 5px));
+        transform: translateY(100%);
 
-        &:hover {
+        .scroll {
+            visibility: hidden;
+            transition: visibility 0s linear 0.3s;
+        }
+
+        &.revealed {
             transform: translateY(0);
+
+            .scroll {
+                visibility: visible;
+                transition-delay: 0s;
+            }
+        }
+
+        @media (hover: hover) {
+            &:hover {
+                transform: translateY(0);
+
+                .scroll {
+                    visibility: visible;
+                    transition-delay: 0s;
+                }
+            }
+        }
+    }
+
+    // Separate rule: unsupported :has() must not invalidate the rules above
+    &.auto-hide:has(:focus-visible) {
+        transform: translateY(0);
+
+        .scroll {
+            visibility: visible;
+            transition-delay: 0s;
         }
     }
 
@@ -2414,21 +2724,8 @@ $youtube-height: 200px;
 
         .button,
         .btn {
-            height: 44px;
+            height: $touch-target;
             white-space: nowrap;
-        }
-
-        .btn-secondary {
-            &.active {
-                //background-color: lighten($primary, 10%);
-            }
-        }
-
-        .close {
-            cursor: pointer;
-            &:hover {
-                color: white;
-            }
         }
 
         .secondary-controls-toggle {
@@ -2456,16 +2753,19 @@ $youtube-height: 200px;
         }
 
         .sync-offset {
-            color: white;
+            color: $ink-strong;
             display: flex;
             align-items: center;
+            gap: 6px;
             background-color: $dark1;
 
             input {
-                margin: 0 5px;
-                background-color: #32393e;
-                border: 1px solid #555b60;
-                color: white;
+                width: 110px;
+                height: $touch-target;
+                margin: 0;
+                background-color: $color;
+                border: 1px solid $field-border;
+                color: $ink-strong;
             }
         }
 
@@ -2479,27 +2779,30 @@ $youtube-height: 200px;
             width: min(560px, calc(100vw - 352px));
             min-height: 180px;
             max-height: calc(100vh - 120px);
-            padding: 8px 40px 8px 8px;
-            color: white;
+            max-height: calc(100dvh - 120px);
+            padding: 8px 56px 8px 8px;
+            color: $ink-strong;
             background-color: $dark1;
             overflow-y: auto;
         }
 
         .youtube-sync-close {
+            @include button-reset;
             position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 28px;
-            height: 28px;
-            padding: 0;
-            color: white;
-            background: transparent;
-            border: 0;
+            top: 2px;
+            right: 2px;
+            display: grid;
+            place-items: center;
+            width: $touch-target;
+            height: $touch-target;
+            color: $ink-strong;
             border-radius: 4px;
 
             &:hover {
-                background-color: #32393e;
+                background-color: $color;
             }
+
+            @include focus-ring;
         }
 
         .youtube-sync-fields {
@@ -2516,12 +2819,12 @@ $youtube-height: 200px;
 
             input {
                 width: 90px;
-                height: 38px;
+                height: $touch-target;
                 padding: 6px 8px;
-                color: white;
+                color: $ink-strong;
                 font-size: 16px;
-                background-color: #32393e;
-                border: 1px solid #555b60;
+                background-color: $color;
+                border: 1px solid $field-border;
             }
         }
 
@@ -2544,7 +2847,7 @@ $youtube-height: 200px;
             gap: 8px;
 
             .warning {
-                color: #f8d84d;
+                color: $warning;
             }
         }
 
@@ -2555,16 +2858,19 @@ $youtube-height: 200px;
             gap: 4px;
 
             button {
-                padding: 2px 5px;
-                color: white;
+                min-height: $touch-target;
+                padding: 2px 12px;
+                color: $ink-strong;
                 font-size: 12px;
-                background: #32393e;
-                border: 1px solid #555b60;
+                background: $color;
+                border: 1px solid $field-border;
                 border-radius: 3px;
 
                 &:hover {
-                    background: #41494f;
+                    background: $chip-hover;
                 }
+
+                @include focus-ring;
             }
         }
 
@@ -2578,27 +2884,30 @@ $youtube-height: 200px;
             flex: 0 0 auto;
             align-items: center;
             gap: 6px;
-            padding: 3px 6px;
-            color: white;
+            min-height: $touch-target;
+            padding: 3px 12px;
+            color: $ink-strong;
             font-size: 12px;
-            background: #32393e;
-            border: 1px solid #555b60;
+            background: $color;
+            border: 1px solid $field-border;
             border-radius: 3px;
 
             &:hover {
-                background: #41494f;
+                background: $chip-hover;
             }
 
             &.active {
-                border-color: #ff9f1a;
-                box-shadow: inset 0 0 0 1px #ff9f1a;
+                border-color: $marker-selected;
+                box-shadow: inset 0 0 0 1px $marker-selected;
             }
+
+            @include focus-ring;
         }
 
         .youtube-sync-point-marker {
             width: 4px;
             height: 20px;
-            background: #f8d84d;
+            background: $warning;
             border-radius: 2px;
         }
 
@@ -2618,39 +2927,47 @@ $youtube-height: 200px;
                 top: 8px;
                 left: 8px;
                 z-index: 1;
-                padding: 5px 9px;
-                color: white;
+                min-height: $touch-target;
+                padding: 5px 12px;
+                color: $ink-strong;
                 font-size: 13px;
                 background: rgb(33 37 41 / 85%);
                 border: 1px solid rgb(255 255 255 / 45%);
                 border-radius: 4px;
+
+                @include focus-ring;
             }
 
             .youtube-video.minimized {
                 width: 320px;
-                height: 40px;
-                background: #212529;
+                height: $touch-target + 16px;
+                background: $panel-dark;
             }
         }
     }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
     .toolbar {
         .scroll {
             position: static;
+
+            > .btn {
+                flex-shrink: 0;
+            }
+
             overflow: visible;
-            justify-content: space-between;
+            justify-content: flex-start;
             gap: 8px;
 
             .track-selector,
             .audio-selector {
+                flex: 0 1 180px;
                 min-width: 0;
 
                 .button {
-                    max-width: 140px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                    width: 100%;
+                    max-width: 180px;
                 }
             }
 
@@ -2663,21 +2980,25 @@ $youtube-height: 200px;
                 flex-wrap: wrap;
                 gap: 8px;
                 padding: 12px 16px;
-                background: #212529;
-                border-top: 1px solid #3c3b40;
+                background: $panel-dark;
+                border-top: 1px solid $toolbar-border;
                 box-shadow: 0 -8px 16px rgb(0 0 0 / 18%);
 
                 &.open {
                     display: flex;
                 }
+            }
 
-                .btn-edit {
-                    flex-grow: 0;
-                }
+            // Edit stays visible, pushed right next to the More toggle
+            .btn-edit {
+                flex-grow: 0;
+                margin-left: auto;
             }
 
             .secondary-controls-toggle {
                 display: inline-flex;
+                justify-content: center;
+                min-width: $touch-target;
                 align-items: center;
                 gap: 6px;
             }
@@ -2685,8 +3006,97 @@ $youtube-height: 200px;
     }
 }
 
-.youtube {
-    margin-top: 20px;
+// Tablet: keep Speed and Zoom inline (compact), the rest stays behind More
+@media (min-width: 701px) and (max-width: 1280px) {
+    .toolbar .scroll {
+        .secondary-controls,
+        .secondary-controls.open {
+            position: static;
+            display: contents;
+            padding: 0;
+            background: none;
+            border: 0;
+            box-shadow: none;
+        }
+
+        .extra-controls {
+            position: absolute;
+            right: 0;
+            bottom: 100%;
+            left: 0;
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px 16px;
+            background: $panel-dark;
+            border-top: 1px solid $toolbar-border;
+            box-shadow: 0 -8px 16px rgb(0 0 0 / 18%);
+        }
+
+        .secondary-controls.open .extra-controls {
+            display: flex;
+        }
+
+        .track-selector,
+        .audio-selector {
+            flex-basis: 150px;
+        }
+
+        .speed-selector > .btn {
+            min-width: 0;
+            padding-inline: 10px;
+
+            .prefix {
+                display: none;
+            }
+        }
+
+        .zoom-selector {
+            gap: 2px;
+
+            .btn {
+                min-width: 36px;
+                padding-inline: 6px;
+            }
+
+            .zoom-value {
+                min-width: 0;
+
+                .prefix {
+                    display: none;
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: 900px) {
+    .toolbar .scroll .btn-edit .label,
+    .toolbar .scroll .restart-button .label {
+        display: none;
+    }
+}
+
+// Phone: icon-only selectors sized to their content
+@media (max-width: 700px) {
+    .toolbar .scroll {
+        .track-selector,
+        .audio-selector {
+            flex: 0 0 auto;
+
+            .button {
+                width: auto;
+                min-width: $touch-target;
+                justify-content: center;
+                padding-inline: 12px;
+
+                .label,
+                .caret {
+                    display: none;
+                }
+            }
+        }
+    }
 }
 
 .score-container {
@@ -2703,14 +3113,14 @@ $youtube-height: 200px;
     position: absolute;
     z-index: 1;
     width: 4px;
-    background: #f8d84d;
+    background: $warning;
     border-radius: 2px;
     transform: translateX(-2px);
 
     &.selected {
         width: 6px;
-        background: #ff9f1a;
-        box-shadow: 0 0 8px #ff9f1a;
+        background: $marker-selected;
+        box-shadow: 0 0 8px $marker-selected;
         transform: translateX(-3px);
     }
 }
@@ -2719,25 +3129,35 @@ h1 {
     text-align: center;
     font-size: 45px;
     font-weight: 300;
-    line-height: 45px;
+    line-height: 1.15;
     word-break: break-word;
 }
 
 .artist-row {
     display: grid;
     align-items: center;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(min-content, 1fr) minmax(0, auto) minmax(min-content, 1fr);
 
     h2 {
         grid-column: 2;
+        grid-row: 1;
+        overflow-wrap: anywhere;
+    }
+
+    .key-signature {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
     }
 
     .drum-notation-selector {
         grid-column: 3;
+        grid-row: 1;
         justify-self: start;
         margin-left: 12px;
 
         > .btn {
+            min-height: $touch-target;
             border-radius: 999px;
         }
     }
@@ -2748,15 +3168,15 @@ h2 {
     margin-bottom: 0;
 }
 
-$color: #32393e;
-$padding: 20px;
-
 .selector {
+    position: relative;
+
     .button {
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        max-width: 280px;
         padding: 10px 15px;
         border-radius: 3px;
         background-color: $color;
@@ -2766,9 +3186,22 @@ $padding: 20px;
         transition: background-color 0.2s;
         white-space: nowrap;
 
+        // Truncate the label, keep icons visible
+        > span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        > svg {
+            flex-shrink: 0;
+        }
+
         &:hover {
             background-color: color.adjust($color, $lightness: 10%);
         }
+
+        @include focus-ring;
     }
 }
 
@@ -2780,18 +3213,106 @@ $padding: 20px;
     border-radius: 3px;
     bottom: $toolbar-height;
     left: 15px;
-    min-width: 400px;
-    overflow: scroll;
+    min-width: min(400px, 100%);
+    max-width: 100%;
+    overflow: auto;
     max-height: calc(100vh - 90px);
+    max-height: calc(100dvh - 90px);
 
     // TODO: No matter how big it is, the tab cursor (z-index: 1000) is always on top of it for unknown reason.
     z-index: 1;
 
+    .list-title {
+        margin: 0 auto 0 8px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0.7;
+    }
+
+    .list-add {
+        display: flex;
+        align-items: center;
+        min-height: $touch-target;
+        padding: $padding;
+        font-weight: 600;
+        text-decoration: none;
+
+        &:hover {
+            background-color: color.adjust($color, $lightness: 4%);
+        }
+
+        .row-icon {
+            width: 24px;
+            margin-right: 12px;
+        }
+
+        @include focus-ring(-3px);
+    }
+
+    .item .name {
+        display: flex;
+        align-items: center;
+        min-height: $touch-target;
+
+        .row-icon {
+            flex-shrink: 0;
+            width: 24px;
+            margin-right: 12px;
+            text-align: center;
+            opacity: 0.85;
+
+            &.youtube {
+                color: #ff4e45;
+                opacity: 1;
+            }
+        }
+
+        .row-label {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .active-check {
+            display: none;
+            flex-shrink: 0;
+            margin-left: auto;
+            padding-left: 12px;
+            color: $active-bar;
+        }
+    }
+
+    .item.active .name .active-check {
+        display: block;
+    }
+
     .list-header {
         position: sticky;
         top: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 4px 8px;
         background-color: $color;
         border-bottom: 1px solid color.adjust($color, $lightness: -5%);
+    }
+
+    .list-close {
+        @include button-reset;
+        display: grid;
+        place-items: center;
+        width: $touch-target;
+        height: $touch-target;
+        border-radius: 4px;
+
+        &:hover {
+            color: $ink-strong;
+            background-color: color.adjust($color, $lightness: 8%);
+        }
+
+        @include focus-ring;
     }
 
     .item {
@@ -2802,6 +3323,7 @@ $padding: 20px;
 
         &.active {
             background-color: color.adjust($color, $lightness: 8%);
+            box-shadow: inset 4px 0 0 $active-bar;
         }
 
         .name {
@@ -2810,19 +3332,69 @@ $padding: 20px;
             padding: $padding;
             height: 100%;
             border-right: 1px solid color.adjust($color, $lightness: -5%);
-
-            &:hover {
-                background-color: color.adjust($color, $lightness: 2%);
-            }
         }
+
+        button.name {
+            @include button-reset;
+            align-self: stretch;
+            min-width: 0;
+            padding: $padding;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+
+            @include focus-ring(-3px);
+        }
+
+        .name:hover,
+        &:hover > .name {
+            background-color: color.adjust($color, $lightness: 2%);
+        }
+    }
+
+    // Audio rows are real buttons
+    button.item {
+        @include button-reset;
+        width: 100%;
+        border-bottom: 1px solid color.adjust($color, $lightness: -5%);
+
+        @include focus-ring(-3px);
     }
 }
 
 .track-list {
+    .boost-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        strong {
+            font-weight: 600;
+        }
+
+        small {
+            opacity: 0.65;
+        }
+    }
+
+    .item .name .row-icon {
+        flex-shrink: 0;
+        width: 24px;
+        margin-right: 10px;
+        text-align: center;
+        opacity: 0.85;
+    }
+
+    .master-volume .name {
+        display: flex;
+        align-items: center;
+    }
+
     .volume-boost-toggle {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 12px;
+        min-height: $touch-target;
         padding: $padding;
         font-size: 13px;
         background-color: color.adjust($color, $lightness: 5%);
@@ -2833,6 +3405,7 @@ $padding: 20px;
     .volume-boost-switch {
         position: relative;
         display: inline-block;
+        flex-shrink: 0;
         width: 36px;
         height: 20px;
 
@@ -2853,7 +3426,7 @@ $padding: 20px;
             }
 
             &:focus-visible + span {
-                outline: 2px solid #f1f4f7;
+                outline: 2px solid $focus-ring-dark;
                 outline-offset: 2px;
             }
         }
@@ -2872,7 +3445,7 @@ $padding: 20px;
                 margin: 2px;
                 content: "";
                 transform: translate(0px, 10%);
-                background-color: #f1f4f7;
+                background-color: $thumb;
                 border-radius: 50%;
                 transition: transform 0.2s;
             }
@@ -2880,7 +3453,7 @@ $padding: 20px;
     }
 
     .volume-column-header {
-        width: 194px;
+        width: $volume-column-width;
         padding: 8px $padding;
         margin-left: auto;
         font-size: 12px;
@@ -2905,14 +3478,30 @@ $padding: 20px;
                 border-bottom: 0;
                 border-left: 0;
                 cursor: pointer;
+
+                @include focus-ring(-3px);
             }
 
-            &:hover {
-                background-color: color.adjust($primary, $lightness: 5%);
+            &.select-percentage {
+                flex: 0 0 $volume-column-width;
+                padding-top: 6px;
+                padding-bottom: 6px;
             }
 
-            &.active {
-                background-color: color.adjust($primary, $lightness: 8%);
+            &.solo:hover:not(:disabled),
+            &.mute:hover:not(:disabled) {
+                background-color: color.adjust($color, $lightness: 18%);
+            }
+
+            // Solo = amber, Mute = red, so the state reads at a glance
+            &.solo.active {
+                color: #1f1f1f;
+                background-color: #f0b429;
+            }
+
+            &.mute.active {
+                color: #fff;
+                background-color: #c9444d;
             }
 
             &:disabled,
@@ -2924,42 +3513,108 @@ $padding: 20px;
     }
 }
 
-.audio-selector {
-    position: relative;
-}
+// Narrow screens: stack each track row (name on its own line, controls below)
+@media (max-width: 600px) {
+    .track-list {
+        .volume-column-header {
+            display: none;
+        }
 
-.track-selector {
-    position: relative;
+        .track,
+        .master-volume {
+            flex-wrap: wrap;
+
+            .name {
+                flex: 1 0 100%;
+                border-right: 0;
+                border-bottom: 1px solid color.adjust($color, $lightness: -5%);
+            }
+
+            .list-button {
+                &.solo,
+                &.mute {
+                    flex: 0 0 auto;
+                    min-height: $touch-target;
+                    padding: 10px 16px;
+                }
+
+                &.select-percentage {
+                    flex: 1 1 0;
+                    min-width: 0;
+                    padding-right: 12px;
+                    padding-left: 12px;
+
+                    input {
+                        flex: 1 1 auto;
+                        width: auto;
+                        min-width: 60px;
+                    }
+                }
+            }
+        }
+
+        .master-volume .select-percentage {
+            border-right: 0;
+        }
+    }
 }
 
 .drum-notation-selector {
     position: relative;
 }
 
+.main.light .artist-row .drum-notation-selector > .btn {
+    --bs-btn-color: #{$popover-ink-light};
+    --bs-btn-border-color: #{$notation-line-light};
+
+    color: $popover-ink-light;
+}
+
 .drum-notation-tooltip {
+    --focus-ring: #{$focus-ring-dark};
+
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
     z-index: 2;
     width: min(650px, calc(100vw - 32px));
     padding: 14px 20px 20px;
-    color: #d8d8dc;
-    background: #262d35;
+    color: var(--notation-ink);
+    background: $popover-bg;
     border-radius: 8px 8px 0 0;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .main.light .drum-notation-tooltip {
-    color: #465467;
-    background: #fff;
+    --focus-ring: #{$focus-ring-light};
+
+    background: $popover-bg-light;
+}
+
+.drum-notation-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--notation-ink);
 }
 
 .drum-notation-title {
     display: block;
-    padding-bottom: 7px;
-    border-bottom: 1px solid #d8d8dc;
     font-size: 12px;
     letter-spacing: 1px;
+}
+
+.notation-close {
+    @include button-reset;
+    display: grid;
+    place-items: center;
+    width: $touch-target;
+    height: $touch-target;
+    margin: -14px -14px -14px 0;
+    border-radius: 4px;
+
+    @include focus-ring;
 }
 
 .drum-notation-groups {
@@ -2976,7 +3631,7 @@ $padding: 20px;
     align-items: start;
     min-width: 0;
     padding-top: 20px;
-    background: repeating-linear-gradient(to bottom, transparent 0 10px, #696970 10px 11px);
+    background: repeating-linear-gradient(to bottom, transparent 0 10px, var(--notation-line) 10px 11px);
     background-position: 0 42px;
     background-repeat: no-repeat;
     background-size: 100% 56px;
@@ -2997,26 +3652,14 @@ $padding: 20px;
         text-align: center;
     }
 
-    .drum-symbol {
-        position: relative;
-        display: block;
-        height: 56px;
-        grid-column: span 1;
-        margin-top: 2px;
-        text-align: center;
-        font-size: 24px;
-        font-style: normal;
-        font-weight: 700;
-    }
-
     svg {
         display: block;
         width: 28px;
         height: 60px;
         justify-self: center;
         overflow: visible;
-        fill: #d8d8dc;
-        stroke: #d8d8dc;
+        fill: var(--notation-ink);
+        stroke: var(--notation-ink);
         stroke-width: 1.2;
     }
 
@@ -3030,44 +3673,46 @@ $padding: 20px;
         fill: none;
         stroke-width: 1;
     }
-
-    .note::after {
-        position: absolute;
-        top: 28px;
-        left: 50%;
-        width: 11px;
-        height: 7px;
-        content: "";
-        background: #d8d8dc;
-        border-radius: 50%;
-        transform: translateX(-50%) rotate(-25deg);
-    }
-
-    .x {
-        color: #e2e2e5;
-    }
-    .circle-x {
-        font-size: 21px;
-    }
-    .foot {
-        align-self: end;
-        margin-top: 35px;
-    }
 }
 
 .drum-notation-group.bass,
 .drum-notation-group.snare,
-.drum-notation-group.ride {
+.drum-notation-group.ride,
+.drum-notation-group.crash {
     grid-template-columns: 1fr;
 }
-.drum-notation-group.hihat {
-    grid-template-columns: repeat(3, 1fr);
-}
+.drum-notation-group.hihat,
 .drum-notation-group.tom {
     grid-template-columns: repeat(3, 1fr);
 }
-.drum-notation-group.crash {
-    grid-template-columns: 1fr;
+
+// Narrow screens: centered dialog with a dimmed backdrop and a 2-column key
+@media (max-width: 700px) {
+    .drum-notation-tooltip {
+        position: fixed;
+        top: 50%;
+        right: auto;
+        left: 50%;
+        z-index: 1100;
+        box-sizing: border-box;
+        width: min(650px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+        overflow-y: auto;
+        border-radius: 8px;
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
+        transform: translate(-50%, -50%);
+    }
+
+    .drum-notation-groups {
+        grid-template-columns: repeat(2, 1fr);
+        row-gap: 24px;
+    }
+
+    .drum-notation-group.hihat,
+    .drum-notation-group.tom {
+        grid-column: 1 / -1;
+    }
 }
 
 .select-percentage {
@@ -3077,35 +3722,53 @@ $padding: 20px;
 
     input {
         width: 120px;
-        height: 6px;
+        height: $touch-target;
         margin: 0;
         appearance: none;
         cursor: pointer;
-        background: #5f6b78;
-        border-radius: 999px;
+        background: transparent;
 
-        &.boost-enabled {
-            background: linear-gradient(to right, #5f6b78 0 49%, #f0c674 49% 51%, #a64040 51% 100%);
+        &::-webkit-slider-runnable-track {
+            height: 6px;
+            background: linear-gradient(to right, $primary-text-dark var(--fill, 0%), $slider-track var(--fill, 0%));
+            border-radius: 999px;
+        }
+
+        &::-moz-range-track {
+            height: 6px;
+            background: linear-gradient(to right, $primary-text-dark var(--fill, 0%), $slider-track var(--fill, 0%));
+            border-radius: 999px;
+        }
+
+        &.boost-enabled::-webkit-slider-runnable-track {
+            background: linear-gradient(to right, $slider-track 0 49%, $slider-boost 49% 51%, $slider-boost-high 51% 100%);
+        }
+
+        &.boost-enabled::-moz-range-track {
+            background: linear-gradient(to right, $slider-track 0 49%, $slider-boost 49% 51%, $slider-boost-high 51% 100%);
         }
 
         &::-webkit-slider-thumb {
-            width: 14px;
-            height: 14px;
+            width: 24px;
+            height: 24px;
+            margin-top: -9px;
             appearance: none;
             cursor: grab;
-            background: #f1f4f7;
-            border: 2px solid #32393e;
+            background: $thumb;
+            border: 2px solid $color;
             border-radius: 50%;
         }
 
         &::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
+            width: 20px;
+            height: 20px;
             cursor: grab;
-            background: #f1f4f7;
-            border: 2px solid #32393e;
+            background: $thumb;
+            border: 2px solid $color;
             border-radius: 50%;
         }
+
+        @include focus-ring(0);
 
         &:disabled {
             cursor: not-allowed;
@@ -3123,7 +3786,22 @@ $padding: 20px;
     position: relative;
 
     > .btn {
-        width: 180px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-width: 180px;
+        max-width: 100%;
+
+        .label {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        > svg {
+            flex-shrink: 0;
+        }
     }
 }
 
@@ -3132,13 +3810,19 @@ $padding: 20px;
     align-items: center;
     gap: 8px;
 
-    span {
+    .zoom-value {
         min-width: 76px;
         text-align: center;
     }
 }
 
+.toolbar .extra-controls {
+    display: contents;
+}
+
 .speed-selector-popover {
+    --focus-ring: #{$focus-ring-dark};
+
     position: absolute;
     bottom: calc(100% + 10px);
     left: 50%;
@@ -3146,16 +3830,19 @@ $padding: 20px;
     box-sizing: border-box;
     width: 420px;
     padding: 12px 18px 22px;
-    color: #d9e0e8;
-    background: #262d35;
+    color: $popover-ink;
+    background: $popover-bg;
     box-shadow: 0 12px 28px rgba(32, 46, 62, 0.14);
     border-radius: 6px;
     transform: translateX(-50%);
 }
 
 .main.light .speed-selector-popover {
-    color: #465467;
-    background: #fff;
+    --focus-ring: #{$focus-ring-light};
+
+    color: $popover-ink-light;
+    background: $popover-bg-light;
+    box-shadow: 0 12px 28px rgba(32, 46, 62, 0.28);
 }
 
 .speed-selector-header {
@@ -3169,48 +3856,57 @@ $padding: 20px;
     .speed-selector-bpm {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 4px;
     }
 
     .speed-selector-bpm button {
-        padding: 0;
-        color: inherit;
+        @include button-reset;
+        min-width: $touch-target;
+        min-height: $touch-target;
         font-size: 24px;
         line-height: 1;
-        background: none;
-        border: 0;
+        border-radius: 4px;
 
         &:hover {
-            color: #65d52f;
+            color: var(--accent);
         }
+
+        @include focus-ring;
     }
 
     .speed-selector-bpm input {
         width: 64px;
+        height: $touch-target;
         padding: 0;
         color: inherit;
         text-align: center;
         background: transparent;
         border: 0;
         font-size: 16px;
+
+        @include focus-ring(-2px);
     }
 
     .speed-reset {
         display: flex;
         align-items: center;
         gap: 5px;
-        padding: 2px 6px;
+        min-height: $touch-target;
+        padding: 2px 10px;
         color: inherit;
         background: transparent;
         border: 0;
+        border-radius: 4px;
 
         &:hover:not(:disabled) {
-            color: #65d52f;
+            color: var(--accent);
         }
 
         &:disabled {
             opacity: .45;
         }
+
+        @include focus-ring;
     }
 }
 
@@ -3248,12 +3944,12 @@ $padding: 20px;
         }
 
         &::-webkit-slider-thumb {
-            width: 20px;
-            height: 20px;
-            margin-top: -1px;
+            width: 28px;
+            height: 28px;
+            margin-top: -5px;
             appearance: none;
-            background: #65d52f;
-            border: 6px solid #344253;
+            background: var(--accent);
+            border: 8px solid $thumb-ring;
             border-radius: 50%;
             box-shadow: 0 3px 8px rgba(25, 35, 48, 0.3);
         }
@@ -3264,12 +3960,14 @@ $padding: 20px;
         }
 
         &::-moz-range-thumb {
-            width: 9px;
-            height: 9px;
-            background: #65d52f;
-            border: 6px solid #344253;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border: 8px solid $thumb-ring;
             border-radius: 50%;
         }
+
+        @include focus-ring(4px);
     }
 }
 
@@ -3286,7 +3984,7 @@ $padding: 20px;
     i {
         width: 1px;
         height: 8px;
-        background: #aab4bf;
+        background: var(--tick);
 
         &.major {
             height: 16px;
@@ -3295,21 +3993,29 @@ $padding: 20px;
 }
 
 .speed-mark {
+    @include button-reset;
     position: absolute;
     z-index: 3;
-    bottom: 48px;
-    padding: 0;
-    color: color-mix(in srgb, currentColor 65%, transparent);
-    background: transparent;
-    border: 0;
+    bottom: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: $touch-target;
+    height: $touch-target;
+    color: color-mix(in srgb, currentColor 82%, transparent);
     font-size: 20px;
-    cursor: pointer;
     transform: translateX(-50%);
 
     &:hover,
-    &:focus-visible,
     &.active {
-        color: #65d52f;
+        color: var(--accent);
+        font-weight: 700;
+    }
+
+    @include focus-ring(-4px);
+
+    &:focus-visible {
+        color: var(--accent);
         font-weight: 700;
     }
 }
@@ -3320,12 +4026,13 @@ $padding: 20px;
     bottom: 47px;
     font-size: 18px;
     font-weight: 700;
-    color: #65d52f;
+    color: var(--accent);
 }
 
 .mobile {
     h1 {
         font-size: 20px;
+        line-height: 1.2;
     }
 
     h2 {
@@ -3343,13 +4050,12 @@ $padding: 20px;
         }
 
         .player-container {
-            position: absolute;
-            top: auto;
-            bottom: 100%;
-            right: 0;
+            // Stack the sync offset input above the video/editor instead of hiding it
+            flex-direction: column;
+            align-items: stretch;
 
             .sync-offset {
-                display: none;
+                justify-content: space-between;
             }
 
             .youtube-sync-fields {
@@ -3369,10 +4075,8 @@ $padding: 20px;
         }
     }
 
-    .speed {
-        input {
-            width: 100px;
-        }
+    .speed-mark {
+        font-size: 16px;
     }
 
     .speed-selector {
@@ -3384,12 +4088,6 @@ $padding: 20px;
             width: 100%;
             transform: none;
         }
-    }
-
-    .drum-notation-tooltip {
-        right: auto;
-        left: 50%;
-        transform: translateX(-50%);
     }
 
     .drum-notation-selector > .btn {
@@ -3404,7 +4102,6 @@ $padding: 20px;
 }
 
 .key-signature {
-    position: absolute;
-    margin-left: 30px;
+    margin-left: 0;
 }
 </style>

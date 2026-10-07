@@ -18,7 +18,8 @@ export default {
         }'
         to="/"
     >
-        <img src="/icon.svg" alt="Drum Tabs" />
+        <!-- The link already has an accessible name; the image is decorative -->
+        <img src="/icon.svg" alt="" />
     </router-link>
 </template>
 

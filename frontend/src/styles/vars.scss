@@ -1,5 +1,10 @@
 $dark1: #1c2024;
+// Decorative/disabled only. Do NOT use for text on dark (about 2.3:1 on #212529); use $muted-dark or var(--dt-muted).
 $color2-dark: #535d65;
+// Muted text on dark backgrounds (>= 6:1 on #212529)
+$muted-dark: #9aa5ae;
+// Primary readable as text/border on dark backgrounds
+$primary-text-dark: #9a9aff;
 
 // Bootstrap Override
 $primary: #3131c6;

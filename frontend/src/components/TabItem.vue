@@ -72,9 +72,12 @@ export default defineComponent({
 <template>
     <div class="tab-item p-3 rounded">
         <button
-            class="fav-btn"
+            class="fav-star"
+            type="button"
+            :class='{ active: tab.fav }'
+            :aria-label="tab.fav ? `Remove ${tab.title} from favorites` : `Add ${tab.title} to favorites`"
+            :aria-pressed="!!tab.fav"
             @click="toggleFav"
-            :class='{ "fav-active": tab.fav }'
         >
             <font-awesome-icon
                 :icon='tab.fav ? "star" : ["far", "star"]'
@@ -87,70 +90,71 @@ export default defineComponent({
             <small v-if="canShowTeacherAssignment && tab.teacherAssignment" class="teacher-badge">From {{ tab.teacherAssignment.teacherName }}</small>
         </router-link>
 
-        <AssignButton v-if="canAssign" resource-type="tab" :resource-id="tab.id" :resource-title="tab.title" />
-        <button class="btn btn-secondary me-2" @click="handleEdit">
-            Edit
-        </button>
+        <div class="actions">
+            <AssignButton v-if="canAssign" resource-type="tab" :resource-id="tab.id" :resource-title="tab.title" />
+            <button class="btn btn-outline-secondary icon-btn" type="button" :aria-label="`Edit ${tab.title}`" @click="handleEdit">
+                <font-awesome-icon icon="pen" />
+                <span class="d-none d-md-inline">Edit</span>
+            </button>
 
-        <button class="btn btn-danger" @click="handleDelete">
-            Delete
-        </button>
+            <button class="btn btn-outline-danger icon-btn" type="button" :aria-label="`Delete ${tab.title}`" @click="handleDelete">
+                <font-awesome-icon icon="trash-can" />
+                <span class="d-none d-md-inline">Delete</span>
+            </button>
+        </div>
     </div>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/vars.scss" as *;
-
 .tab-item {
     display: flex;
+    align-items: center;
+    gap: 8px;
     transition: background-color 0.1s;
 
     &:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-    }
-
-    .fav-btn {
-        background: none;
-        border: none;
-        font-size: 20px;
-        color: #9e9e9e;
-        cursor: pointer;
-        padding: 0;
-        margin-right: 12px;
-        align-self: center;
-        transition: color 0.2s;
-
-        &:hover {
-            color: #ffa500;
-        }
-
-        &.fav-active {
-            color: #ffa500;
-        }
+        background-color: rgba(128, 128, 128, 0.08);
     }
 
     .info {
-        flex-grow: 1;
+        flex: 1 1 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         justify-content: center;
+        overflow-wrap: anywhere;
 
         .title {
             font-size: 20px;
         }
 
         .artist {
-            color: $color2-dark;
+            color: var(--dt-muted);
         }
 
         .teacher-badge {
-            color: #d87d30;
+            color: var(--dt-accent);
             font-weight: 700;
         }
     }
 
-    button {
-        align-self: center;
+    .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+    }
+}
+
+// Narrow screens: title keeps the full row, actions drop below it
+@media (max-width: 575px) {
+    .tab-item {
+        flex-wrap: wrap;
+
+        .actions {
+            flex: 1 0 100%;
+            justify-content: flex-end;
+        }
     }
 }
 </style>

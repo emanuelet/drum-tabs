@@ -1,6 +1,6 @@
 services:
     app:
-        image: emanuelet/drumtabs:1.9.0
+        image: emanuelet/drumtabs:1.9.1
         ports:
             # Host Port:Container Port
             - "47777:47777"

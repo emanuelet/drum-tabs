@@ -14,17 +14,29 @@ export default defineComponent({
             pin: "",
             repeatPin: "",
             role: "learner",
+            errors: {},
+            formError: "",
         };
     },
     methods: {
-        async submit() {
-            if (this.pin !== this.repeatPin) {
-                notify({
-                    title: "PINs do not match",
-                    type: "error",
-                });
-                return;
+        validate() {
+            const errors = {};
+            if (!this.name.trim()) errors.name = "Enter your name.";
+            if (!this.email.trim()) errors.email = "Enter your email.";
+            else if (!/^\S+@\S+\.\S+$/.test(this.email.trim())) errors.email = "Enter a valid email address.";
+            if (!/^\d{6}$/.test(this.pin)) errors.pin = "PIN must be exactly 6 digits.";
+            if (this.pin !== this.repeatPin) errors.repeat = "PINs do not match.";
+            this.errors = errors;
+            const first = Object.keys(errors)[0];
+            if (first) {
+                const ids = { name: "name", email: "email", pin: "pin", repeat: "repeat" };
+                document.getElementById(ids[first])?.focus();
             }
+            return !first;
+        },
+        async submit() {
+            this.formError = "";
+            if (!this.validate()) return;
 
             this.processing = true;
             try {
@@ -36,10 +48,10 @@ export default defineComponent({
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || data.msg || "Registration failed");
-                notify({ title: "Account created. Log in with your PIN.", type: "success" });
+                notify({ text: "Account created. Log in with your PIN.", type: "success" });
                 this.$router.push("/login");
             } catch (error) {
-                notify({ title: error.message || "Registration failed", type: "error" });
+                this.formError = error.message || "Registration failed";
             } finally {
                 this.processing = false;
             }
@@ -49,62 +61,77 @@ export default defineComponent({
 </script>
 
 <template>
-    <div class="form-container" data-cy="setup-form">
+    <main id="main-content" tabindex="-1" class="form-container" data-cy="setup-form">
         <div class="form">
-            <form @submit.prevent="submit">
-                <div style="font-size: 28px; font-weight: bold" class="mb-5 mt-5">
-                    Drum Tabs
+            <form @submit.prevent="submit" novalidate>
+                <div class="brand mb-4 mt-4">
+                    <Logo inline />
+                    <div class="brand-name">Drum Tabs</div>
                 </div>
 
-                <p class="mt-3">
+                <h1 class="fs-5 mt-3">
                     Create your account
-                </p>
+                </h1>
 
                 <div class="form-floating mt-3">
-                    <input id="name" v-model="name" type="text" class="form-control" placeholder="Name" required>
+                    <input id="name" v-model="name" type="text" autocomplete="name" class="form-control" placeholder="Name" required :aria-invalid="!!errors.name"
+                        :aria-describedby="errors.name ? 'name-error' : undefined">
                     <label for="name">Name</label>
                 </div>
+                <div v-if="errors.name" id="name-error" class="form-error" role="alert">{{ errors.name }}</div>
 
                 <div class="form-floating mt-3">
-                    <input id="floatingInput" v-model="email" type="email" class="form-control" :placeholder='$t("Username")' required>
-                    <label for="floatingInput">{{ $t("Email") }}</label>
+                    <input id="email" v-model="email" type="email" autocomplete="email" class="form-control" placeholder="Email" required :aria-invalid="!!errors.email"
+                        :aria-describedby="errors.email ? 'email-error' : undefined">
+                    <label for="email">Email</label>
                 </div>
+                <div v-if="errors.email" id="email-error" class="form-error" role="alert">{{ errors.email }}</div>
 
                 <div class="form-floating mt-3">
-                    <input id="pin" v-model="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="6-digit PIN" required>
+                    <input id="pin" v-model="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" class="form-control" placeholder="6-digit PIN" required
+                        :aria-invalid="!!errors.pin" :aria-describedby="errors.pin ? 'pin-error' : undefined">
                     <label for="pin">6-digit PIN</label>
                 </div>
+                <div v-if="errors.pin" id="pin-error" class="form-error" role="alert">{{ errors.pin }}</div>
 
                 <div class="form-floating mt-3">
-                    <input id="repeat" v-model="repeatPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="form-control" placeholder="Repeat PIN" required>
+                    <input id="repeat" v-model="repeatPin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" class="form-control" placeholder="Repeat PIN" required
+                        :aria-invalid="!!errors.repeat" :aria-describedby="errors.repeat ? 'repeat-error' : undefined">
                     <label for="repeat">Repeat PIN</label>
                 </div>
+                <div v-if="errors.repeat" id="repeat-error" class="form-error" role="alert">{{ errors.repeat }}</div>
 
-                <div
-                    class="mt-3"><span class="form-label d-block">I am a</span><div class="btn-group" role="group" aria-label="Role"><button type="button" class="btn" :class="role === 'learner' ? 'btn-primary' : 'btn-outline-secondary'" @click="role = 'learner'">Learner</button><button type="button" class="btn" :class="role === 'teacher' ? 'btn-primary' : 'btn-outline-secondary'" @click="role = 'teacher'">Teacher</button></div></div>
+                <fieldset class="mt-3 text-start">
+                    <legend class="form-label fs-6">I am a</legend>
+                    <div class="btn-group toggle-group" role="group">
+                        <input id="role-learner" v-model="role" type="radio" class="btn-check" name="role" value="learner">
+                        <label class="btn btn-outline-secondary" for="role-learner">Learner</label>
+                        <input id="role-teacher" v-model="role" type="radio" class="btn-check" name="role" value="teacher">
+                        <label class="btn btn-outline-secondary" for="role-teacher">Teacher</label>
+                    </div>
+                </fieldset>
 
                 <button class="w-100 btn btn-primary mt-3" type="submit" :disabled="processing">
-                    {{ $t("Create") }}
+                    {{ processing ? "Creating..." : "Create" }}
                 </button>
+
+                <div v-if="formError" class="form-error text-center mt-3" role="alert">{{ formError }}</div>
                 <router-link class="d-block mt-3" to="/login">Already have an account? Log in</router-link>
             </form>
         </div>
-    </div>
+    </main>
 </template>
 
 <style scoped lang="scss">
-.form-container {
-    display: flex;
-    align-items: center;
-    padding-top: 40px;
-    padding-bottom: 40px;
+.brand {
+    :deep(.navbar-brand) {
+        display: block;
+        margin: 0 auto 12px;
+    }
 }
 
-.form {
-    width: 100%;
-    max-width: 330px;
-    padding: 15px;
-    margin: auto;
-    text-align: center;
+.brand-name {
+    font-size: 28px;
+    font-weight: bold;
 }
 </style>

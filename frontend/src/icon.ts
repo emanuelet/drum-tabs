@@ -11,10 +11,13 @@ import {
     faArrowRightFromBracket,
     faArrowRightToBracket,
     faArrowUpRightFromSquare,
+    faBackwardStep,
+    faBars,
     faCaretDown,
     faCheck,
     faCompress,
     faDrum,
+    faEllipsis,
     faExpand,
     faFile,
     faFolder,
@@ -35,11 +38,13 @@ import {
     faStar,
     faStopwatch,
     faTrashCan,
+    faUsers,
     faVolumeHigh,
     faVolumeXmark,
     faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
+import { faYoutube } from "@fortawesome/free-brands-svg-icons";
 
 library.add([
     faFile,
@@ -65,6 +70,11 @@ library.add([
     faStarRegular,
     faArrowLeft,
     faArrowUpRightFromSquare,
+    faBackwardStep,
+    faBars,
+    faEllipsis,
+    faUsers,
+    faYoutube,
     faDrum,
     faExpand,
     faGaugeHigh,

@@ -1,16 +1,11 @@
 <script>
 import { defineComponent } from "vue";
-import { BButton, BButtonGroup, BFormInput, BSpinner } from "bootstrap-vue-next";
 import { authClient, isLoggedIn } from "../auth-client.ts";
 import Logo from "../components/Logo.vue";
-import { baseURL } from "../app.ts";
+import { clearMe, fetchMe } from "../me.ts";
 
 export default defineComponent({
     components: {
-        BButton,
-        BButtonGroup,
-        BFormInput,
-        BSpinner,
         Logo,
     },
     data() {
@@ -23,12 +18,17 @@ export default defineComponent({
         };
     },
     async mounted() {
+        document.addEventListener("click", this.onDocumentClick);
+        document.addEventListener("keydown", this.onKeydown);
         this.isLoggedIn = await isLoggedIn();
         if (this.isLoggedIn) {
-            const res = await fetch(baseURL + "/api/me", { credentials: "include" });
-            if (res.ok) this.user = (await res.json()).user;
+            this.user = await fetchMe();
         }
         this.ready = true;
+    },
+    beforeUnmount() {
+        document.removeEventListener("click", this.onDocumentClick);
+        document.removeEventListener("keydown", this.onKeydown);
     },
     watch: {
         $route() {
@@ -38,11 +38,24 @@ export default defineComponent({
     },
     methods: {
         async signOut() {
-            const res = await authClient.signOut();
+            await authClient.signOut();
+            clearMe();
             this.$router.push("/login");
         },
         onSetFixedHeader(val) {
             this.fixedNavbar = val;
+        },
+        onDocumentClick(event) {
+            if (!this.mobileMenuOpen) return;
+            if (!this.$refs.navbar?.contains(event.target)) {
+                this.mobileMenuOpen = false;
+            }
+        },
+        onKeydown(event) {
+            if (event.key === "Escape" && this.mobileMenuOpen) {
+                this.mobileMenuOpen = false;
+                this.$refs.menuToggle?.focus();
+            }
         },
     },
 });
@@ -52,12 +65,22 @@ export default defineComponent({
     <div :class='{
         "fixed-navbar": fixedNavbar,
     }'>
-        <div class="my-navbar">
+        <header ref="navbar" class="my-navbar">
             <Logo />
 
-            <button class="mobile-menu-toggle" type="button" aria-controls="mobile-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">Menu</button>
+            <button
+                ref="menuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-controls="mobile-navigation"
+                aria-label="Menu"
+                :aria-expanded="mobileMenuOpen"
+                @click="mobileMenuOpen = !mobileMenuOpen"
+            >
+                <font-awesome-icon :icon='["fas", mobileMenuOpen ? "xmark" : "bars"]' />
+            </button>
 
-            <div id="mobile-navigation" class="toolbar" :class="{ open: mobileMenuOpen }">
+            <nav id="mobile-navigation" class="toolbar" aria-label="Main" :class="{ open: mobileMenuOpen }">
                 <div class="left" v-show="ready">
                     <router-link to="/" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "folder"]' />
@@ -70,11 +93,11 @@ export default defineComponent({
                     </router-link>
 
                     <router-link to="/students" v-if="user?.role === 'teacher'">
-                        <font-awesome-icon :icon='["fas", "folder"]' />
+                        <font-awesome-icon :icon='["fas", "users"]' />
                         Students
                     </router-link>
 
-                    <router-link to="/settings">
+                    <router-link to="/settings" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "gear"]' />
                         Settings
                     </router-link>
@@ -82,32 +105,33 @@ export default defineComponent({
                     <a class="metronome-link" href="https://drum-metronome.pages.dev/" target="_blank" rel="noopener noreferrer">
                         <font-awesome-icon :icon='["fas", "arrow-up-right-from-square"]' />
                         Drum Metronome
+                        <span class="visually-hidden">(opens in a new tab)</span>
                     </a>
                 </div>
 
                 <div class="right" v-show="ready">
-                    <a class="sign-out-link" href="#" @click.prevent="signOut()" v-if="isLoggedIn">
+                    <button class="sign-out-link" type="button" @click="signOut()" v-if="isLoggedIn">
                         <font-awesome-icon :icon='["fas", "arrow-right-from-bracket"]' />
                         Log out
-                    </a>
+                    </button>
 
                     <router-link to="/login" v-else>
                         <font-awesome-icon :icon='["fas", "arrow-right-to-bracket"]' />
                         Log in
                     </router-link>
                 </div>
-            </div>
-        </div>
+            </nav>
+        </header>
 
-        <router-view v-slot="{ Component }">
-            <component :is="Component" @setFixedHeader="onSetFixedHeader" />
-        </router-view>
+        <main id="main-content" tabindex="-1">
+            <router-view v-slot="{ Component }">
+                <component :is="Component" @setFixedHeader="onSetFixedHeader" />
+            </router-view>
+        </main>
     </div>
 </template>
 
 <style lang="scss" scoped>
-@use "../styles/vars.scss" as *;
-
 $navHeight: 100px;
 
 .fixed-navbar {
@@ -119,32 +143,34 @@ $navHeight: 100px;
         z-index: 1000;
         width: 100vw;
         margin-bottom: 0;
-        background-color: #212529;
+        background-color: var(--dt-surface);
     }
 }
 
 .my-navbar {
     height: $navHeight;
-    border-bottom: 1px solid #3c3b40;
+    border-bottom: 1px solid var(--dt-divider);
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 20px;
 
-    [data-bs-theme="light"] & {
-        border-bottom-color: #dadada;
-    }
-
     .toolbar {
-        padding: 0 30px 0 40px;
+        padding: 0 clamp(12px, 3vw, 30px) 0 clamp(12px, 4vw, 40px);
         flex: 1;
+        min-width: 0;
         display: flex;
         justify-content: space-between;
+        column-gap: 16px;
 
         & > div {
             flex-grow: 4;
+            min-width: 0;
             display: flex;
-            column-gap: 50px;
+            flex-wrap: wrap;
+            // shrinks with the viewport instead of a fixed 50px, so 768-1000px does not overflow
+            column-gap: clamp(14px, 2.5vw, 50px);
+            row-gap: 4px;
 
             &.left {
                 justify-content: flex-start;
@@ -154,10 +180,13 @@ $navHeight: 100px;
                 justify-content: flex-end;
             }
 
-            & > a {
+            & > a,
+            & > button {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                min-height: 44px;
+                min-width: 44px;
 
                 // item from top to bottom
                 flex-direction: column;
@@ -169,11 +198,15 @@ $navHeight: 100px;
         }
 
         .metronome-link {
-            color: #9fd6ff;
+            color: var(--dt-link-nav-metronome);
         }
 
         .sign-out-link {
-            color: #ffb1b8;
+            padding: 0;
+            font: inherit;
+            color: var(--dt-link-nav-signout);
+            background: none;
+            border: 0;
         }
     }
 
@@ -210,8 +243,8 @@ $navHeight: 100px;
             flex-basis: 100%;
             display: none;
             padding: 8px 16px 16px;
-            background-color: #212529;
-            border-bottom: 1px solid #3c3b40;
+            background-color: var(--dt-surface);
+            border-bottom: 1px solid var(--dt-divider);
             box-shadow: 0 8px 16px rgb(0 0 0 / 18%);
 
             &.open {
@@ -229,7 +262,9 @@ $navHeight: 100px;
                     justify-content: stretch;
                 }
 
-                & > a {
+                & > a,
+                & > button {
+                    width: 100%;
                     flex-direction: row;
                     justify-content: flex-start;
                     gap: 14px;
@@ -252,16 +287,21 @@ $navHeight: 100px;
                 &.right {
                     margin-top: 8px;
                     padding-top: 8px;
-                    border-top: 1px solid #3c3b40;
+                    border-top: 1px solid var(--dt-divider);
                 }
             }
         }
 
         .mobile-menu-toggle {
-            display: block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
             margin-left: auto;
             margin-right: 12px;
-            padding: 6px 10px;
+            padding: 0;
+            font-size: 20px;
             color: inherit;
             background: transparent;
             border: 1px solid currentColor;

@@ -22,6 +22,7 @@ export default defineComponent({
             ugMode: "guitar-pro",
             ugResults: [],
             ugLoading: false,
+            ugSearched: false,
             ugSelectedTab: null,
             ugError: "",
         };
@@ -91,7 +92,9 @@ export default defineComponent({
                 this.$router.push(`/tab/${firstId}`);
             }
 
-            // Reset Dropzone
+            // Reset Dropzone (also when some uploads failed, so the same files are not re-sent)
+            this.files = [];
+            this.$refs.dropzone?.clearFiles();
             this.isUploading = false;
         },
         async importPastedDrumAscii() {
@@ -149,6 +152,8 @@ export default defineComponent({
         async searchUltimateGuitar() {
             this.ugError = "";
             this.ugResults = [];
+            this.ugSearched = false;
+            this.ugSelectedTab = null;
             const cookie = this.getUltimateGuitarCookie();
             if (!cookie) return;
             this.ugLoading = true;
@@ -161,6 +166,7 @@ export default defineComponent({
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.msg || "Ultimate Guitar search failed");
                 this.ugResults = data.results || [];
+                this.ugSearched = true;
             } catch (e) {
                 this.ugError = e.message || "Ultimate Guitar search failed";
             } finally {
@@ -235,9 +241,10 @@ export default defineComponent({
 
 <template>
     <div class="container my-container">
-        <div class="display-6 mb-4 mt-5">Upload tabs or text sheets</div>
+        <h1 class="display-6 mb-4 mt-5">Upload tabs or text sheets</h1>
 
         <Vue3Dropzone
+            ref="dropzone"
             v-model="files"
             :maxFileSize="500"
             :multiple="true"
@@ -256,65 +263,80 @@ export default defineComponent({
             {{ isUploading ? "Uploading..." : "Upload" }}
         </button>
 
-        <button
-            v-if="selectedMusicXmlFile"
-            @click="upload"
-            class="btn btn-outline-secondary w-100 mt-2"
-            :disabled="isUploading"
-        >
-            Import Selected Drum MusicXML
-        </button>
-        <section class="mt-5">
-            <h2>Paste Drum ASCII</h2>
-            <textarea v-model="drumAsciiText" class="form-control mb-2" rows="10" placeholder="Paste drum ASCII tab here"></textarea>
+        <section class="mt-5" aria-labelledby="ascii-heading">
+            <h2 id="ascii-heading">Paste Drum ASCII</h2>
+            <label for="drumAsciiText" class="form-label">Drum ASCII tab</label>
+            <textarea id="drumAsciiText" v-model="drumAsciiText" class="form-control mb-2" rows="10" placeholder="Paste drum ASCII tab here"></textarea>
             <div class="row g-2">
-                <div class="col"><input v-model="drumAsciiTitle" class="form-control" placeholder="Title (optional)" /></div>
-                <div class="col"><input v-model="drumAsciiArtist" class="form-control" placeholder="Artist (optional)" /></div>
-                <div class="col-auto"><button class="btn btn-outline-primary" :disabled="isUploading" @click="importPastedDrumAscii">Import as MusicXML</button></div>
+                <div class="col-12 col-md">
+                    <label for="drumAsciiTitle" class="form-label">Title (optional)</label>
+                    <input id="drumAsciiTitle" v-model="drumAsciiTitle" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-12 col-md">
+                    <label for="drumAsciiArtist" class="form-label">Artist (optional)</label>
+                    <input id="drumAsciiArtist" v-model="drumAsciiArtist" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-12 col-md-auto d-flex align-items-end">
+                    <button class="btn btn-outline-primary w-100 touch-target" :disabled="isUploading" @click="importPastedDrumAscii">Import as MusicXML</button>
+                </div>
             </div>
         </section>
-        <section class="ultimate-guitar mt-5">
-            <h2>Ultimate Guitar</h2>
+        <section class="ultimate-guitar mt-5" aria-labelledby="ug-heading">
+            <h2 id="ug-heading">Ultimate Guitar</h2>
             <p
-                class="text-secondary">Configure the Cookie header in <router-link :to="{ name: 'settings' }">Settings</router-link>. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
-            <div class="d-flex gap-2 mb-3">
-                <input v-model="ugQuery" class="form-control" placeholder="Artist or song" @keyup.enter="searchUltimateGuitar" />
-                <div class="btn-group" role="group" aria-label="Ultimate Guitar import mode">
-                    <button type="button" class="btn" :class="ugMode === 'guitar-pro' ? 'btn-primary' : 'btn-outline-secondary'" @click="ugMode = 'guitar-pro'">Guitar Pro with drums</button>
-                    <button type="button" class="btn" :class="ugMode === 'ascii-drums' ? 'btn-primary' : 'btn-outline-secondary'" @click="ugMode = 'ascii-drums'">ASCII drum tabs</button>
+                class="text-dt-muted">Configure the Cookie header in <router-link :to="{ name: 'settings' }">Settings</router-link>. It is kept only in this browser and sent to Ultimate Guitar requests.</p>
+            <div class="row g-2 mb-3">
+                <div class="col-12 col-md">
+                    <label for="ugQuery" class="form-label">Artist or song</label>
+                    <input id="ugQuery" v-model="ugQuery" class="form-control" autocomplete="off" @keyup.enter="searchUltimateGuitar" />
                 </div>
-                <button class="btn btn-primary" :disabled="ugLoading" @click="searchUltimateGuitar">{{ ugLoading ? "Searching..." : "Search" }}</button>
+                <div class="col-12 col-md-auto">
+                    <fieldset>
+                        <legend class="form-label fs-6">Import type</legend>
+                        <div class="btn-group toggle-group flex-wrap" role="group">
+                            <input id="ug-mode-gp" v-model="ugMode" type="radio" class="btn-check" name="ugMode" value="guitar-pro">
+                            <label class="btn btn-outline-secondary" for="ug-mode-gp">Guitar Pro with drums</label>
+                            <input id="ug-mode-ascii" v-model="ugMode" type="radio" class="btn-check" name="ugMode" value="ascii-drums">
+                            <label class="btn btn-outline-secondary" for="ug-mode-ascii">ASCII drum tabs</label>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="col-12 col-md-auto d-flex align-items-end">
+                    <button class="btn btn-primary w-100 touch-target" :disabled="ugLoading" @click="searchUltimateGuitar">{{ ugLoading ? "Searching..." : "Search" }}</button>
+                </div>
             </div>
-            <div v-if="ugError" class="alert alert-danger">{{ ugError }}</div>
+            <div v-if="ugLoading" class="text-dt-muted mb-3" role="status">
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Searching Ultimate Guitar...
+            </div>
+            <div v-if="ugError" class="alert alert-danger" role="alert">{{ ugError }}</div>
+            <p v-if="ugSearched && !ugLoading && ugResults.length === 0 && !ugError" class="text-dt-muted" role="status">No results found. Try a different artist or song.</p>
             <div v-for="result in ugResults" :key="result.url" class="card mb-2">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div><strong>{{ result.title }}</strong><span v-if="result.artist"> by {{ result.artist }}</span><br /><small>Rating: {{ result.rating ?? "unknown" }}</small></div>
-                    <button class="btn btn-outline-primary" @click="openUltimateGuitarResult(result)">Open</button>
+                <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                    <div><strong>{{ result.title }}</strong><span v-if="result.artist"> by {{ result.artist }}</span><small class="d-block text-dt-muted">Rating: {{ result.rating ?? "unknown" }}</small></div>
+                    <button class="btn btn-outline-primary touch-target" :aria-label="`Open ${result.title}`" @click="openUltimateGuitarResult(result)">Open</button>
                 </div>
             </div>
             <div v-if="ugSelectedTab && !ugSelectedTab.loading" class="mt-3">
-                <h4>{{ ugSelectedTab.title }}</h4>
+                <h3 class="h4">{{ ugSelectedTab.title }}</h3>
                 <pre v-if="ugMode === 'ascii-drums'" class="tab-text">{{ ugSelectedTab.text || "No tab text found." }}</pre>
                 <button v-if="ugMode === 'ascii-drums' && ugSelectedTab.text" class="btn btn-secondary me-2" @click="copyUltimateGuitarText">Copy entire tab</button>
                 <button v-if="ugMode === 'guitar-pro'" class="btn btn-primary" :disabled="isUploading" @click="importUltimateGuitarResult">Download and import</button>
             </div>
+            <div v-else-if="ugSelectedTab?.loading" class="text-dt-muted mt-3" role="status">
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading tab...
+            </div>
         </section>
 
-        <ul class="mt-3">
-            <li>
-                <a href="#" @click.prevent='createEmpty("bass")' class="me-3">Create Empty Bass Tab</a>
-            </li>
-            <li>
-                <a href="#" @click.prevent='createEmpty("guitar")'>Create Empty Guitar Tab</a>
-            </li>
-            <li>
-                <a href="#" @click.prevent='createEmpty("drum")'>Create Empty Drum Tab</a>
-            </li>
-        </ul>
+        <section class="mt-5" aria-labelledby="empty-heading">
+            <h2 id="empty-heading" class="h4">Start from an empty tab</h2>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary touch-target" :disabled="isUploading" @click='createEmpty("bass")'>Create Empty Bass Tab</button>
+                <button type="button" class="btn btn-outline-secondary touch-target" :disabled="isUploading" @click='createEmpty("guitar")'>Create Empty Guitar Tab</button>
+                <button type="button" class="btn btn-outline-secondary touch-target" :disabled="isUploading" @click='createEmpty("drum")'>Create Empty Drum Tab</button>
+            </div>
+        </section>
 
-        <div></div>
-
-        <h4 class="mt-5">Free Resources</h4>
+        <h2 class="h4 mt-5">Free Resources</h2>
 
         <ul class="free-resources">
             <li><a href="https://www.ultimate-guitar.com/" target="_blank" rel="noopener">Ultimate Guitar</a><br />Some free tabs in *.gp format</li>
@@ -328,13 +350,22 @@ export default defineComponent({
     </div>
 </template>
 
-<style lang="scss">
-.img-details {
+<style scoped lang="scss">
+// The dropzone renders this class inside its own template
+:deep(.img-details) {
     opacity: 1 !important;
     visibility: visible !important;
 }
 
 .free-resources li {
     margin-bottom: 15px;
+}
+
+.tab-text {
+    max-height: 60vh;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--dt-divider);
+    border-radius: 4px;
 }
 </style>

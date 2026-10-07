@@ -1,0 +1,145 @@
+// Shared, theme-aware building blocks (global classes).
+// Theme tokens (--dt-*) are declared in main.scss.
+
+.eyebrow {
+    color: var(--dt-accent);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.text-dt-muted {
+    color: var(--dt-muted);
+}
+
+// Dialog shell used by Students, Exercises, AssignButton, ConfirmDialog.
+// Set --dt-dialog-width on the element to change the width.
+.dt-dialog {
+    width: min(var(--dt-dialog-width, 560px), calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 24px;
+    color: var(--bs-body-color);
+    background: var(--bs-body-bg);
+    border: 1px solid var(--dt-border);
+    border-radius: 8px;
+
+    &::backdrop {
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    h2 {
+        margin: 0;
+        font-size: 1.3rem;
+    }
+}
+
+.dt-dialog-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.dt-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+// Favourite star button (TabItem, Exercises)
+.fav-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: var(--dt-muted);
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.2s;
+
+    &:hover,
+    &.active {
+        color: var(--dt-star);
+    }
+}
+
+// Login / Register shell
+.form-container {
+    display: flex;
+    align-items: center;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.form-container .form {
+    width: 100%;
+    max-width: 330px;
+    padding: 15px;
+    margin: auto;
+    text-align: center;
+}
+
+.form-error {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    text-align: left;
+    color: var(--dt-danger-text);
+}
+
+// Segmented radio group made from .btn-check + label (replaces button toggles)
+.toggle-group .btn-check:checked + .btn {
+    color: #fff;
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.toggle-group .btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+}
+
+// Minimum 44px touch target for icon / small buttons where needed
+.touch-target {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 8px;
+    z-index: 3000;
+    padding: 10px 16px;
+    color: #fff;
+    background: var(--bs-primary);
+    border-radius: 4px;
+
+    &:focus {
+        top: 8px;
+    }
+}
+
+.state-block {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--dt-muted);
+}

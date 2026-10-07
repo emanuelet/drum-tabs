@@ -9,11 +9,47 @@
     $form-check-input-bg: $form-check-input-bg,
     $form-check-input-border: $form-check-input-border,
 );
+@use "components";
 
-// Cursor color
+// Theme tokens. The app is dark by default; light values apply under data-bs-theme="light".
+:root,
+[data-bs-theme="dark"] {
+    --dt-muted: #{$muted-dark};
+    --dt-border: #7b858d; // form control borders (>= 3:1)
+    --dt-divider: #3c3b40;
+    --dt-surface: #212529;
+    --dt-accent: #e0883a;
+    --dt-star: #ffa500;
+    --dt-focus: #8ab4ff;
+    --dt-primary-text: #{$primary-text-dark};
+    --dt-danger-text: #ff9a9a;
+    --dt-link-nav-metronome: #9fd6ff;
+    --dt-link-nav-signout: #ffb1b8;
+    // Player (AlphaTab) markers on a dark score
+    --at-cursor-bg: rgba(255, 193, 7, 0.28);
+    --at-cursor-edge: #ffc107;
+    --at-highlight: #ffd166;
+}
+
+[data-bs-theme="light"] {
+    --dt-muted: #5a646c;
+    --dt-border: #8a949c;
+    --dt-divider: #dadada;
+    --dt-surface: #ffffff;
+    --dt-accent: #a85a14;
+    --dt-star: #b36b00;
+    --dt-focus: #1f4fd1;
+    --dt-primary-text: #{$primary};
+    --dt-danger-text: #b02a37;
+    --dt-link-nav-metronome: #0b5394;
+    --dt-link-nav-signout: #a61e2a;
+}
+
+// Cursor color. Light scores (.main.light on the tab page) get blue/purple markers so they stay
+// readable on #f1f1f1 and distinct from the amber/orange sync markers.
 .at-cursor-beat {
-    background: rgba(255, 193, 7, 0.28);
-    border-left: 2px solid #ffc107;
+    background: var(--at-cursor-bg);
+    border-left: 2px solid var(--at-cursor-edge);
     margin-left: 1px;
 }
 
@@ -28,31 +64,92 @@
 
 // Highlight color
 .at-highlight * {
-    fill: #ffd166;
-    stroke: #ffd166;
+    fill: var(--at-highlight);
+    stroke: var(--at-highlight);
 }
 
-@include bootstrap.color-mode(dark) {
-    .form-control {
-        background-color: $dark1;
+.light,
+[data-bs-theme="light"] {
+    --at-cursor-bg: rgba(31, 79, 209, 0.18);
+    --at-cursor-edge: #1f4fd1;
+    --at-highlight: #7a2fd0;
 
-        &:focus {
-            background-color: color.adjust($dark1, $lightness: -10%);
-            border-color: $dark1;
-            box-shadow: 0 0 0 0.2rem rgba($dark1, 0.25);
-        }
+    .at-cursor-bar {
+        background: rgba(31, 79, 209, 0.1);
     }
 }
 
-@include bootstrap.color-mode(light) {}
+@include bootstrap.color-mode(dark) {
+    .form-control,
+    .form-select {
+        background-color: $dark1;
+        color: var(--bs-body-color);
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        background-color: color.adjust($dark1, $lightness: -4%);
+    }
+
+    // Primary (#3131c6) is ~2:1 on dark. Outline variant uses a lighter tint for text/border.
+    .btn-outline-primary {
+        --bs-btn-color: var(--dt-primary-text);
+        --bs-btn-border-color: var(--dt-primary-text);
+        --bs-btn-hover-bg: #{$primary};
+        --bs-btn-hover-border-color: #{$primary};
+        --bs-btn-hover-color: #fff;
+        --bs-btn-active-bg: #{$primary};
+        --bs-btn-active-border-color: #{$primary};
+        --bs-btn-active-color: #fff;
+    }
+
+    .btn-outline-secondary {
+        --bs-btn-color: #b4bcc3;
+        --bs-btn-border-color: #8a949c;
+    }
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+    border-color: var(--dt-border);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--dt-focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--dt-focus) 35%, transparent);
+}
+
+// Global keyboard focus ring (Bootstrap removes outlines on some controls)
+:focus-visible {
+    outline: 2px solid var(--dt-focus);
+    outline-offset: 2px;
+}
+
+.btn:focus-visible,
+.btn-check:focus-visible + .btn,
+.form-check-input:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.btn-close:focus-visible {
+    outline: 2px solid var(--dt-focus);
+    outline-offset: 2px;
+}
 
 a {
     text-decoration: none;
     transition: color 0.2s;
 }
 
-.form-select {
-    background-color: $dark1;
+// Links embedded in running text must not rely on colour alone (WCAG 1.4.1)
+p a:not(.btn),
+li a:not(.btn),
+.form-text a,
+.alert a,
+footer a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
 }
 
 .form-floating {
@@ -67,4 +164,9 @@ a {
 
 .my-container {
     max-width: 1024px;
+}
+
+// Skip-link target; no ring needed when focused programmatically
+main:focus {
+    outline: none;
 }

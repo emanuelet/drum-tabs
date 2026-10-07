@@ -3,6 +3,8 @@ import { defineComponent } from "vue";
 import { baseURL, getSetting } from "../app.js";
 import { notify } from "@kyvg/vue3-notification";
 import AssignButton from "../components/AssignButton.vue";
+import { confirmAction } from "../confirm.ts";
+import { fetchMe } from "../me.ts";
 
 const alphaTab = await import("@coderline/alphatab");
 
@@ -60,6 +62,9 @@ export default defineComponent({
             selectedTrackIndex: 0,
             saving: false,
             ready: false,
+            loading: true,
+            loadError: "",
+            addOpener: null,
             assignmentsByExercise: {},
             user: null,
             fullscreen: false,
@@ -88,37 +93,44 @@ export default defineComponent({
             core: { fontDirectory: "/font/", engine: "html5" },
             player: { enablePlayer: true, enableCursor: true, soundFont: "/soundfont/sonivox.sf2", playerMode: alphaTab.PlayerMode.EnabledSynthesizer },
             notation: { elements: { scoreTitle: false, scoreSubTitle: false, scoreArtist: false } },
-            display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources },
+            display: { staveProfile: alphaTab.StaveProfile.ScoreTab, scale: this.setting.scale, resources, padding: [10, 35] },
         });
         this.api.playerStateChanged.on((event) => this.playing = event.state === alphaTab.synth.PlayerState.Playing);
         document.addEventListener("fullscreenchange", this.updateFullscreenState);
-        try {
-            const [exerciseRes, assignmentRes, userRes] = await Promise.all([
-                fetch(baseURL + "/api/exercises", { credentials: "include" }),
-                fetch(baseURL + "/api/assignments", { credentials: "include" }),
-                fetch(baseURL + "/api/me", { credentials: "include" }),
-            ]);
-            const data = await exerciseRes.json();
-            const assignmentData = await assignmentRes.json();
-            if (!exerciseRes.ok) throw new Error(data.msg || "Failed to load exercises");
-            if (!assignmentRes.ok) throw new Error(assignmentData.msg || "Failed to load assignments");
-            this.exercises = data.exercises;
-            this.assignmentsByExercise = Object.fromEntries(
-                assignmentData.assignments.filter((assignment) => assignment.resourceType === "exercise").map((assignment) => [assignment.resourceId, assignment]),
-            );
-            if (userRes.ok) this.user = (await userRes.json()).user;
-            this.selected = this.exercises[0] || null;
-            this.loadExercise();
-            this.ready = true;
-        } catch (error) {
-            notify({ text: error.message || "Failed to load exercises", type: "error" });
-        }
+        await this.loadData();
     },
     beforeUnmount() {
         document.removeEventListener("fullscreenchange", this.updateFullscreenState);
         this.api?.destroy();
     },
     methods: {
+        async loadData() {
+            this.loading = true;
+            this.loadError = "";
+            try {
+                const [exerciseRes, assignmentRes, user] = await Promise.all([
+                    fetch(baseURL + "/api/exercises", { credentials: "include" }),
+                    fetch(baseURL + "/api/assignments", { credentials: "include" }),
+                    fetchMe(),
+                ]);
+                const data = await exerciseRes.json();
+                const assignmentData = await assignmentRes.json();
+                if (!exerciseRes.ok) throw new Error(data.msg || "Failed to load exercises");
+                if (!assignmentRes.ok) throw new Error(assignmentData.msg || "Failed to load assignments");
+                this.exercises = data.exercises;
+                this.assignmentsByExercise = Object.fromEntries(
+                    assignmentData.assignments.filter((assignment) => assignment.resourceType === "exercise").map((assignment) => [assignment.resourceId, assignment]),
+                );
+                this.user = user;
+                this.selected = this.exercises[0] || null;
+                this.loadExercise();
+                this.ready = true;
+            } catch (error) {
+                this.loadError = error.message || "Failed to load exercises";
+            } finally {
+                this.loading = false;
+            }
+        },
         loadExercise() {
             if (!this.selected || !this.api) return;
             this.tempo = this.selected.tempo;
@@ -209,13 +221,15 @@ export default defineComponent({
                 event.target.value = "";
             }
         },
-        openAddDialog() {
+        openAddDialog(event) {
+            this.addOpener = event?.currentTarget || null;
             this.editingExercise = null;
             this.alphaTex = "";
             this.alphaTexAnalysis = null;
             this.$refs.addDialog.showModal();
         },
-        openEditDialog(exercise) {
+        openEditDialog(exercise, event) {
+            this.addOpener = event?.currentTarget || null;
             this.editingExercise = exercise;
             this.alphaTex = exercise.alphaTex;
             this.$refs.addDialog.showModal();
@@ -223,6 +237,10 @@ export default defineComponent({
         },
         closeAddDialog() {
             this.$refs.addDialog.close();
+        },
+        onAddDialogClosed() {
+            if (this.addOpener && document.contains(this.addOpener)) this.addOpener.focus();
+            this.addOpener = null;
         },
         analyzeAlphaTex() {
             if (!this.alphaTex.trim()) {
@@ -265,7 +283,12 @@ export default defineComponent({
             }
         },
         async deleteExercise(exercise) {
-            if (!confirm(`Delete "${exercise.title}"?`)) return;
+            const ok = await confirmAction({
+                title: "Delete exercise?",
+                message: `Delete "${exercise.title}"? This cannot be undone.`,
+                confirmText: "Delete",
+            });
+            if (!ok) return;
             try {
                 const res = await fetch(baseURL + `/api/exercises/${exercise.id}`, {
                     method: "DELETE",
@@ -291,12 +314,19 @@ export default defineComponent({
 </script>
 
 <template>
-    <main class="container exercises">
+    <div class="container exercises">
         <header>
             <p class="eyebrow">Practice library</p>
             <h1>Drum exercises</h1>
             <p>Practice patterns stored separately from your tab library.</p>
         </header>
+        <div v-if="loading" class="state-block" role="status">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading exercises...
+        </div>
+        <div v-else-if="loadError" class="state-block" role="alert">
+            <p class="mb-3">{{ loadError }}</p>
+            <button class="btn btn-outline-primary" type="button" @click="loadData">Retry</button>
+        </div>
         <div class="exercise-layout">
             <div class="exercise-library">
                 <section v-if="ready && favoriteExercises.length" class="favorites">
@@ -304,10 +334,10 @@ export default defineComponent({
                         <h2>Favorites</h2>
                     </div>
                     <div class="exercise-grid">
-                        <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected.id === exercise.id }">
+                        <article v-for="exercise in favoriteExercises" :key="exercise.id" class="exercise-card" :class="{ active: selected?.id === exercise.id }">
                             <button class="exercise-select"
                                 @click="selectExercise(exercise)"><strong>{{ exercise.title }}</strong><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em></button>
-                            <button class="star-button" type="button" title="Remove from favorites" aria-label="Remove from favorites"
+                            <button class="fav-star active" type="button" :title="`Remove ${exercise.title} from favorites`" :aria-label="`Remove ${exercise.title} from favorites`" aria-pressed="true"
                                 @click="toggleFav(exercise)"><font-awesome-icon icon="star" /></button>
                         </article>
                     </div>
@@ -321,51 +351,74 @@ export default defineComponent({
                                 <input v-model="searchQuery" class="form-control" type="search" placeholder="Search exercises" aria-label="Search exercises" />
                                 <button v-if="searchQuery" class="btn btn-outline-secondary" type="button" @click="searchQuery = ''">Clear</button>
                             </div>
-                            <button class="btn btn-primary" type="button" @click="openAddDialog">Add</button>
+                            <button class="btn btn-primary touch-target" type="button" @click="openAddDialog">Add</button>
                         </div>
                     </div>
                     <div class="exercise-list">
-                        <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected.id === exercise.id }">
+                        <article v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-row" :class="{ active: selected?.id === exercise.id }">
                             <button class="exercise-select" @click="selectExercise(exercise)">
                                 <strong>{{ exercise.title }}</strong><span v-if="exercise.subtitle">{{ exercise.subtitle }}</span><small>{{ exercise.tempo }} BPM</small><em v-if="user?.role === 'learner' && assignmentsByExercise[exercise.id]">From {{ assignmentsByExercise[exercise.id].teacherName }}</em>
                             </button>
-                            <button class="star-button" type="button" :title="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
-                                :aria-label="exercise.fav ? 'Remove from favorites' : 'Add to favorites'"
+                            <button class="fav-star" :class="{ active: exercise.fav }" type="button"
+                                :title="exercise.fav ? `Remove ${exercise.title} from favorites` : `Add ${exercise.title} to favorites`"
+                                :aria-label="exercise.fav ? `Remove ${exercise.title} from favorites` : `Add ${exercise.title} to favorites`" :aria-pressed="!!exercise.fav"
                                 @click="toggleFav(exercise)"><font-awesome-icon :icon="exercise.fav ? 'star' : ['far', 'star']" /></button>
-                            <AssignButton v-if="user?.role === 'teacher'" outline resource-type="exercise" :resource-id="exercise.id" :resource-title="exercise.title" />
-                            <button class="btn btn-sm btn-outline-secondary icon-button" type="button" title="Edit exercise" aria-label="Edit exercise"
-                                @click="openEditDialog(exercise)"><font-awesome-icon icon="pen" /></button>
-                            <button class="btn btn-sm btn-outline-danger icon-button" type="button" title="Delete exercise" aria-label="Delete exercise"
+                            <AssignButton v-if="user?.role === 'teacher'" resource-type="exercise" :resource-id="exercise.id" :resource-title="exercise.title" />
+                            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" :title="`Edit ${exercise.title}`" :aria-label="`Edit ${exercise.title}`"
+                                @click="openEditDialog(exercise, $event)"><font-awesome-icon icon="pen" /></button>
+                            <button class="btn btn-sm btn-outline-danger icon-btn" type="button" :title="`Delete ${exercise.title}`" :aria-label="`Delete ${exercise.title}`"
                                 @click="deleteExercise(exercise)"><font-awesome-icon icon="trash-can" /></button>
                         </article>
                     </div>
-                    <p v-if="filteredExercises.length === 0" class="text-muted mt-3">No exercises match "{{ searchQuery }}".</p>
+                    <p v-if="exercises.length === 0" class="text-dt-muted mt-3">No exercises yet. Use Add to paste AlphaTex or import a Guitar Pro file.</p>
+                    <p v-else-if="filteredExercises.length === 0" class="text-dt-muted mt-3">No exercises match "{{ searchQuery }}".</p>
                 </section>
             </div>
             <section ref="player" class="player" :class="{ light: setting.scoreColor === 'light' }">
                 <button class="btn btn-outline-secondary fullscreen-button" type="button" :title="fullscreen ? 'Exit full screen' : 'Full screen'"
                     :aria-label="fullscreen ? 'Exit full screen' : 'Full screen'" @click="toggleFullscreen"><font-awesome-icon :icon="fullscreen ? 'compress' : 'expand'" /></button>
                 <div class="controls">
-                    <button class="btn btn-primary" :disabled="!selected" @click="playPause">{{ playing ? "Pause" : "Play" }}</button>
-                    <label class="tempo-control">Tempo <input v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" /> <input v-model.number="tempo"
-                            :disabled="!selected" type="number" min="30" max="240" step="1" aria-label="Tempo in BPM" /> BPM</label>
-                    <label><input v-model="metronome" type="checkbox" /> Metronome</label>
-                    <label><input v-model="looping" type="checkbox" /> Loop</label>
+                    <button class="btn play-button" :class="playing ? 'btn-success' : 'btn-primary'" type="button" :disabled="!selected" @click="playPause">
+                        <font-awesome-icon :icon="playing ? 'pause' : 'play'" />
+                        {{ playing ? "Pause" : "Play" }}
+                    </button>
+                    <div class="tempo-control">
+                        <label for="tempo-range">Tempo</label>
+                        <input id="tempo-range" v-model.number="tempo" :disabled="!selected" type="range" min="30" max="240" aria-label="Tempo slider" />
+                        <input id="tempo-number" v-model.number="tempo" class="form-control form-control-sm" :disabled="!selected" type="number" min="30" max="240" step="1"
+                            aria-label="Tempo in BPM" />
+                        <span class="bpm-unit" aria-hidden="true">BPM</span>
+                    </div>
+                    <div class="toggle-chips">
+                        <button class="chip" :class="{ active: metronome }" type="button" :aria-pressed="metronome" @click="metronome = !metronome">
+                            <font-awesome-icon :icon="metronome ? 'check' : 'stopwatch'" /> Metronome
+                        </button>
+                        <button class="chip" :class="{ active: looping }" type="button" :aria-pressed="looping" @click="looping = !looping">
+                            <font-awesome-icon :icon="looping ? 'check' : 'repeat'" /> Loop
+                        </button>
+                    </div>
                     <label v-if="exerciseTracks.length > 1"
-                        class="track-control">Exercise <select v-model.number="selectedTrackIndex"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
+                        class="track-control">Exercise <select v-model.number="selectedTrackIndex" class="form-select form-select-sm"><option v-for="(track, index) in exerciseTracks" :key="track.title" :value="index">{{ track.title }}</option></select></label>
                 </div>
-                <h2 class="score-title">{{ selected?.title || "Loading exercise..." }}</h2>
-                <p v-if="selected?.subtitle" class="score-subtitle">{{ selected.subtitle }}</p>
-                <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light' }"></div>
+                <header class="score-header">
+                    <h2 class="score-title">{{ selected?.title || (ready ? "No exercise selected" : "Loading exercise...") }}</h2>
+                    <p v-if="ready && !selected" class="text-dt-muted mb-0">Add an exercise to start practising.</p>
+                    <p v-if="selected?.subtitle" class="score-subtitle">{{ selected.subtitle }}</p>
+                </header>
+                <div ref="score" class="score" :class="{ light: setting.scoreColor === 'light', empty: !selected }"></div>
             </section>
         </div>
-        <dialog ref="addDialog" class="add-dialog">
+        <dialog ref="addDialog" class="dt-dialog add-dialog" style="--dt-dialog-width: 720px" aria-labelledby="exercise-dialog-title" @close="onAddDialogClosed">
             <form @submit.prevent="saveExercise">
-                <div
-                    class="dialog-heading"><h2>{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2><button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button></div>
-                <p class="text-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>, or import a Guitar Pro file. The subtitle is optional.</p>
-                <label class="btn btn-outline-secondary import-guitar-pro">Import Guitar Pro<input type="file" accept=".gp,.gpx,.gp3,.gp4,.gp5" @change="importGuitarPro" /></label>
-                <textarea v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
+                <div class="dt-dialog-heading">
+                    <h2 id="exercise-dialog-title">{{ editingExercise ? "Edit exercise" : "Add exercise" }}</h2>
+                    <button class="btn-close" type="button" aria-label="Close" @click="closeAddDialog"></button>
+                </div>
+                <p class="text-dt-muted">Paste AlphaTex containing at least <code>\title</code> and <code>\tempo</code>, or import a Guitar Pro file. The subtitle is optional.</p>
+                <label
+                    class="btn btn-outline-secondary import-guitar-pro">Import Guitar Pro<input type="file" class="visually-hidden" accept=".gp,.gpx,.gp3,.gp4,.gp5" @change="importGuitarPro" /></label>
+                <label for="alphaTexInput" class="form-label">AlphaTex</label>
+                <textarea id="alphaTexInput" v-model="alphaTex" class="form-control" rows="14" placeholder="Paste AlphaTex here" @input="analyzeAlphaTex"></textarea>
                 <div v-if="alphaTexAnalysis" class="alphatex-analysis" :class="alphaTexAnalysis.valid ? 'valid' : 'invalid'">
                     <strong>{{ alphaTexAnalysis.valid ? "Syntax valid" : "Syntax invalid" }}</strong>
                     <span
@@ -374,11 +427,13 @@ export default defineComponent({
                         <li v-for="diagnostic in alphaTexAnalysis.diagnostics" :key="diagnostic">{{ diagnostic }}</li>
                     </ul>
                 </div>
-                <div
-                    class="dialog-actions"><button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button><button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button></div>
+                <div class="dt-dialog-actions">
+                    <button class="btn btn-outline-secondary" type="button" @click="closeAddDialog">Cancel</button>
+                    <button class="btn btn-success" type="submit" :disabled="saving">{{ saving ? "Saving..." : "Save exercise" }}</button>
+                </div>
             </form>
         </dialog>
-    </main>
+    </div>
 </template>
 
 <style scoped lang="scss">
@@ -387,12 +442,6 @@ export default defineComponent({
 }
 header {
     padding: 2rem 0 1rem;
-}
-.eyebrow {
-    color: #d87d30;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
 }
 .favorites,
 .all-exercises {
@@ -427,6 +476,7 @@ header {
 .exercise-select {
     border: 0;
     padding: 0;
+    min-height: 44px;
     width: 100%;
     color: inherit;
     background: transparent;
@@ -444,12 +494,12 @@ header {
     padding: 16px;
     color: inherit;
     background: transparent;
-    border: 1px solid #555;
+    border: 1px solid var(--dt-divider);
     border-radius: 8px;
 }
 .exercise-card.active {
-    border-color: #d87d30;
-    box-shadow: inset 0 0 0 1px #d87d30;
+    border-color: var(--dt-accent);
+    box-shadow: inset 0 0 0 1px var(--dt-accent);
 }
 .exercise-card span,
 .exercise-card small {
@@ -460,25 +510,27 @@ header {
     opacity: .7;
 }
 .exercise-list {
-    border: 1px solid #555;
+    border: 1px solid var(--dt-divider);
     border-radius: 8px;
     overflow: hidden;
 }
 .exercise-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
+    gap: 8px 12px;
     padding: 12px 16px;
-    border-bottom: 1px solid #555;
+    border-bottom: 1px solid var(--dt-divider);
 }
 .exercise-row:last-child {
     border-bottom: 0;
 }
 .exercise-row.active {
-    box-shadow: inset 3px 0 0 #d87d30;
+    box-shadow: inset 3px 0 0 var(--dt-accent);
 }
 .exercise-row .exercise-select {
-    flex: 1;
+    flex: 1 1 160px;
+    min-width: 0;
 }
 .exercise-row span,
 .exercise-row small {
@@ -488,33 +540,21 @@ header {
     opacity: .7;
 }
 .exercise-row em {
-    color: #d87d30;
+    color: var(--dt-accent);
     font-style: normal;
     font-weight: 700;
 }
-.star-button {
+.exercise-card .fav-star {
     align-self: flex-start;
-    padding: 0;
-    color: #9e9e9e;
-    background: none;
-    border: 0;
-    font-size: 20px;
 }
-.star-button:hover,
-.exercise-card .star-button {
-    color: #ffa500;
-}
-.exercise-row .star-button {
+.exercise-row .fav-star {
     align-self: center;
-}
-.icon-button {
-    min-width: 34px;
 }
 .player {
     position: relative;
     display: flex;
     flex-direction: column;
-    border: 1px solid #555;
+    border: 1px solid var(--dt-divider);
     border-radius: 8px;
     overflow: hidden;
 }
@@ -539,54 +579,117 @@ header {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
-    padding: 12px 56px 12px 12px;
+    gap: 12px 20px;
+    padding: 14px 64px 14px 16px;
     background: rgba(128, 128, 128, .12);
+    border-bottom: 1px solid var(--dt-divider);
+}
+.play-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 104px;
+    min-height: 44px;
+    font-weight: 600;
+}
+.bpm-unit {
+    font-size: .85rem;
+    color: var(--dt-muted, #9aa5ae);
+}
+.tempo-control label {
+    margin: 0;
+    font-size: .85rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--dt-muted, #9aa5ae);
+}
+.toggle-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 14px;
+    color: inherit;
+    font-size: .9rem;
+    background: transparent;
+    border: 1px solid var(--dt-divider);
+    border-radius: 999px;
+    transition: background-color .15s, border-color .15s;
+
+    &:hover {
+        background: rgba(128, 128, 128, .18);
+    }
+
+    &.active {
+        color: #fff;
+        background: var(--bs-primary);
+        border-color: var(--bs-primary);
+    }
 }
 .controls input[type="number"] {
     width: 70px;
 }
 .tempo-control {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    min-width: 0;
 }
 .tempo-control input[type="range"] {
     width: min(220px, 42vw);
+    min-width: 0;
+    accent-color: var(--bs-primary);
+}
+.controls .tempo-control input[type="number"] {
+    width: 76px;
 }
 .track-control {
     display: flex;
     align-items: center;
     gap: 8px;
 }
+.score.empty {
+    visibility: hidden;
+}
 .score {
     min-height: 260px;
     overflow-x: auto;
-    padding: 16px;
+    padding: 12px 20px 20px;
 
     &.light {
         background: #f1f1f1;
     }
 }
+.score-header {
+    padding: 18px 20px 0;
+}
+.score-subtitle {
+    margin: 4px 0 0;
+    color: var(--dt-muted, #9aa5ae);
+
+    .player.light & {
+        color: #555;
+    }
+}
 .score-title {
     margin: 0;
-    padding: 18px 16px 0;
-    font-size: 1.25rem;
+    font-size: 1.35rem;
+    font-weight: 600;
 
     .player.light & {
         color: #333;
     }
 }
-.add-dialog {
-    width: min(720px, calc(100vw - 32px));
-    color: inherit;
-    background: var(--bs-body-bg);
-    border: 1px solid #555;
-    border-radius: 8px;
-    padding: 20px;
-}
-.add-dialog::backdrop {
-    background: rgba(0, 0, 0, .65);
+.add-dialog textarea {
+    font-family: var(--bs-font-monospace);
 }
 .alphatex-analysis {
     display: flex;
@@ -600,8 +703,9 @@ header {
     display: inline-flex;
     margin-bottom: 12px;
 }
-.import-guitar-pro input {
-    display: none;
+.import-guitar-pro:focus-within {
+    outline: 2px solid var(--dt-focus);
+    outline-offset: 2px;
 }
 .alphatex-analysis.valid {
     color: #9dd37c;
@@ -616,27 +720,18 @@ header {
     margin: 0;
     padding-left: 20px;
 }
-.dialog-heading,
-.dialog-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-.dialog-heading h2 {
-    margin: 0;
-    font-size: 1.4rem;
-}
-.dialog-actions {
-    justify-content: flex-end;
-    margin-top: 16px;
-}
 @media (max-width: 991px) {
     .exercise-layout {
         grid-template-columns: 1fr;
     }
 }
 @media (max-width: 575px) {
+    .tempo-control {
+        flex: 1 1 100%;
+    }
+    .tempo-control input[type="range"] {
+        flex: 1 1 120px;
+    }
     .search {
         max-width: none;
         flex: 1;

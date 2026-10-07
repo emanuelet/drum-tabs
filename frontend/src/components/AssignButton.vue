@@ -5,16 +5,21 @@ import { baseURL } from "../app.js";
 
 export default defineComponent({
     props: {
-        outline: { type: Boolean, default: false },
         resourceType: { type: String, required: true },
-        resourceId: { type: String, required: true },
+        resourceId: { type: [String, Number], required: true },
         resourceTitle: { type: String, required: true },
     },
     data() {
-        return { students: [], learnerId: "", loading: false, assigning: false };
+        return { students: [], learnerId: "", loading: false, assigning: false, opener: null };
+    },
+    computed: {
+        selectId() {
+            return `assign-learner-${this.resourceType}-${this.resourceId}`;
+        },
     },
     methods: {
-        async open() {
+        async open(event) {
+            this.opener = event?.currentTarget || null;
             this.loading = true;
             try {
                 const res = await fetch(baseURL + "/api/students", { credentials: "include" });
@@ -29,8 +34,12 @@ export default defineComponent({
                 this.loading = false;
             }
         },
+        onClose() {
+            // The trigger is disabled while loading, so focus is restored explicitly
+            this.opener?.focus();
+        },
         async assign() {
-            if (!this.learnerId) return;
+            if (!this.learnerId || this.assigning) return;
             this.assigning = true;
             try {
                 const res = await fetch(baseURL + "/api/assignments", {
@@ -54,20 +63,33 @@ export default defineComponent({
 </script>
 
 <template>
-    <button class="btn btn-sm" :class="outline ? 'btn-outline-primary' : 'btn-primary me-2' " type="button" :disabled="loading" @click="open">Assign</button>
-    <dialog ref="dialog" class="assign-dialog">
-        <form @submit.prevent="assign">
-            <h2>Assign {{ resourceTitle }}</h2>
-            <p v-if="students.length === 0" class="text-muted">Connect a learner from Students before assigning practice.</p>
-            <select v-else v-model="learnerId" class="form-select"><option v-for="student in students" :key="student.id" :value="student.id">{{ student.name }}</option></select>
-            <div class="actions"><button class="btn btn-outline-secondary" type="button" @click="$refs.dialog.close()">Cancel</button><button class="btn btn-primary" type="submit" :disabled="!learnerId || assigning">Assign</button></div>
-        </form>
-    </dialog>
+    <span class="assign-button">
+        <button class="btn btn-sm btn-outline-primary touch-target" type="button" :aria-label="`Assign ${resourceTitle}`" :aria-busy="loading" :disabled="loading" @click="open">
+            {{ loading ? "Loading..." : "Assign" }}
+        </button>
+        <dialog ref="dialog" class="dt-dialog" style="--dt-dialog-width: 420px" :aria-labelledby="`${selectId}-title`" @close="onClose">
+            <form @submit.prevent="assign">
+                <div class="dt-dialog-heading">
+                    <h2 :id="`${selectId}-title`">Assign {{ resourceTitle }}</h2>
+                </div>
+                <p v-if="students.length === 0" class="text-dt-muted">Connect a learner from Students before assigning practice.</p>
+                <template v-else>
+                    <label :for="selectId" class="form-label">Learner</label>
+                    <select :id="selectId" v-model="learnerId" class="form-select">
+                        <option v-for="student in students" :key="student.id" :value="student.id">{{ student.name }}</option>
+                    </select>
+                </template>
+                <div class="dt-dialog-actions">
+                    <button class="btn btn-outline-secondary" type="button" @click="$refs.dialog.close()">Cancel</button>
+                    <button class="btn btn-primary" type="submit" :disabled="!learnerId || assigning">{{ assigning ? "Assigning..." : "Assign" }}</button>
+                </div>
+            </form>
+        </dialog>
+    </span>
 </template>
 
 <style scoped lang="scss">
-.assign-dialog { width: min(420px, calc(100vw - 32px)); padding: 24px; color: inherit; background: #212529; border: 1px solid #555; border-radius: 8px; }
-.assign-dialog::backdrop { background: rgba(0, 0, 0, .55); }
-.assign-dialog h2 { margin: 0 0 16px; font-size: 1.25rem; }
-.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.assign-button {
+    display: contents;
+}
 </style>
